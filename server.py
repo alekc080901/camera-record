@@ -1,4 +1,5 @@
 import os
+import json
 
 import uvicorn
 
@@ -8,8 +9,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from const import VIDEO_PATH
-from video import count_images
+from const import VIDEO_PATH, DATE_FORMAT
+from video import count_images, calculate_image_number
 
 app = FastAPI()
 
@@ -19,7 +20,7 @@ Path(VIDEO_PATH).mkdir(exist_ok=True)
 class VideoRecorderInput(BaseModel):
     name: str
     comment: str
-    rtsp_route: str
+    rtsp_url: str
     date_from: datetime
     date_to: datetime
     fpm: int
@@ -27,6 +28,13 @@ class VideoRecorderInput(BaseModel):
 
 @app.post('/')
 async def record(record_params: VideoRecorderInput):
+
+    if not record_params.rtsp_url.startswith('rtsp://'):
+        return {
+            'error': True,
+            'description': f'RTSP url must start with "rtsp://"! Got {record_params.rtsp_url}.'
+        }
+
     video_path = os.path.join(VIDEO_PATH, record_params.name)
 
     if os.path.exists(video_path):
@@ -34,8 +42,19 @@ async def record(record_params: VideoRecorderInput):
             'error': True,
             'description': f'The name {record_params.name} has already been occupied!'
         }
-
     Path(video_path).mkdir()
+
+    with open(os.path.join(video_path, 'video_info.json'), 'w') as file:
+        info = {
+            "name": record_params.name,
+            "comment": record_params.comment,
+            "rtsp_url": record_params.rtsp_url,
+            "date_from": record_params.date_from.strftime(DATE_FORMAT),
+            "date_to": record_params.date_to.strftime(DATE_FORMAT),
+            "fpm": record_params.fpm,
+            "image_number": calculate_image_number(record_params.date_from, record_params.date_to, record_params.fpm)
+        }
+        json.dump(info, file)
 
     return {
         'date': (record_params.date_from, record_params.date_to)
@@ -45,8 +64,14 @@ async def record(record_params: VideoRecorderInput):
 @app.get('/{name}')
 async def get_progress(name):
     video_path = os.path.join(VIDEO_PATH, name)
+
     if os.path.exists(video_path):
-        return count_images(video_path)
+
+        with open(os.path.join(video_path, 'video_info.json'), 'r') as file:
+            video_info = json.load(file)
+            image_number = video_info['image_number']
+
+        return f'{count_images(video_path)}/{image_number}'
 
     return 'No such task is currently running.'
 
