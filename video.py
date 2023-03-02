@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import cv2
 
 from const import IMAGE_EXTENSIONS
@@ -16,12 +17,19 @@ def count_images(path: str) -> int:
 def calculate_image_number(date1: datetime, date2: datetime, fpm: int) -> int:
     return int((date2 - date1).seconds / 60 * fpm)
 
-def recording(rtsp: str, fps):
+
+def record_video(dest: str, rtsp: str, fps: float, goal: int):
     cap = cv2.VideoCapture(rtsp)
 
-    input_fps = cap.get(cv2.CAP_PROP_FPS)
+    camera_fps = cap.get(cv2.CAP_PROP_FPS)
 
-    while True:
-        ret, frame = cap.read()
+    for i in range(goal):
+        for _ in range(int(1 / fps * camera_fps)):
+            cap.grab()
+
+        ret, frame = cap.retrieve()
+
         if ret:
-            cv2.imwrite(path, frame)
+            cv2.imwrite(f'{dest}/{i}.jpeg', frame)
+        else:
+            print('VideoCapture returned something bad.')

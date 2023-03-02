@@ -9,8 +9,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from transliterate import translit
+
 from const import VIDEO_PATH, DATE_FORMAT
-from video import count_images, calculate_image_number
+from video import count_images, calculate_image_number, record_video
 
 app = FastAPI()
 
@@ -27,7 +29,7 @@ class VideoRecorderInput(BaseModel):
 
 
 @app.post('/')
-async def record(record_params: VideoRecorderInput):
+def record(record_params: VideoRecorderInput):
 
     if not record_params.rtsp_url.startswith('rtsp://'):
         return {
@@ -35,14 +37,18 @@ async def record(record_params: VideoRecorderInput):
             'description': f'RTSP url must start with "rtsp://"! Got {record_params.rtsp_url}.'
         }
 
+    record_params.name = translit(record_params.name, 'ru', reversed=True)
+
     video_path = os.path.join(VIDEO_PATH, record_params.name)
 
-    if os.path.exists(video_path):
-        return {
-            'error': True,
-            'description': f'The name {record_params.name} has already been occupied!'
-        }
-    Path(video_path).mkdir()
+    # if os.path.exists(video_path):
+    #     return {
+    #         'error': True,
+    #         'description': f'The name {record_params.name} has already been occupied!'
+    #     }
+    Path(video_path).mkdir(exist_ok=True)
+
+    image_number = calculate_image_number(record_params.date_from, record_params.date_to, record_params.fpm)
 
     with open(os.path.join(video_path, 'video_info.json'), 'w') as file:
         info = {
@@ -52,9 +58,11 @@ async def record(record_params: VideoRecorderInput):
             "date_from": record_params.date_from.strftime(DATE_FORMAT),
             "date_to": record_params.date_to.strftime(DATE_FORMAT),
             "fpm": record_params.fpm,
-            "image_number": calculate_image_number(record_params.date_from, record_params.date_to, record_params.fpm)
+            "image_number": image_number
         }
         json.dump(info, file)
+
+    record_video(video_path, record_params.rtsp_url, record_params.fpm / 60, image_number)
 
     return {
         'date': (record_params.date_from, record_params.date_to)
