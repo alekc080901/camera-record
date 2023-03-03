@@ -1,5 +1,4 @@
 import os
-import json
 
 import uvicorn
 
@@ -8,11 +7,13 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import Dict, List
 
 from transliterate import translit
 
 from const import VIDEO_PATH, DATE_FORMAT
-from video import count_images, calculate_image_number, record_video
+from video import count_images, VideoRecorder
+from database import db
 
 app = FastAPI()
 
@@ -23,63 +24,68 @@ class VideoRecorderInput(BaseModel):
     name: str
     comment: str
     rtsp_url: str
-    date_from: datetime
-    date_to: datetime
     fpm: int
+    intervals: List[Dict[str, datetime]]
 
 
 @app.post('/')
-def record(record_params: VideoRecorderInput):
+async def record(video_params: VideoRecorderInput):
+    name, comment, rtsp_url, fpm, intervals = video_params.dict().values()
 
-    if not record_params.rtsp_url.startswith('rtsp://'):
+    if not rtsp_url.startswith('rtsp://'):
         return {
             'error': True,
-            'description': f'RTSP url must start with "rtsp://"! Got {record_params.rtsp_url}.'
+            'description': f'RTSP url must start with "rtsp://"! Got {rtsp_url}.'
         }
 
-    record_params.name = translit(record_params.name, 'ru', reversed=True)
+    name = translit(name, 'ru', reversed=True)
 
-    video_path = os.path.join(VIDEO_PATH, record_params.name)
+    video_path = f'{VIDEO_PATH}/{name}'
 
     # if os.path.exists(video_path):
     #     return {
     #         'error': True,
-    #         'description': f'The name {record_params.name} has already been occupied!'
+    #         'description': f'The name {name} has already been occupied!'
     #     }
     Path(video_path).mkdir(exist_ok=True)
 
-    image_number = calculate_image_number(record_params.date_from, record_params.date_to, record_params.fpm)
+    for i, interval in enumerate(intervals):
+        rec = VideoRecorder(
+            rtsp_string=rtsp_url,
+            video_path=video_path,
+            fpm=fpm,
+            start_date=interval['date_from'],
+            end_date=interval['date_to'],
+        )
 
-    with open(os.path.join(video_path, 'video_info.json'), 'w') as file:
-        info = {
-            "name": record_params.name,
-            "comment": record_params.comment,
-            "rtsp_url": record_params.rtsp_url,
-            "date_from": record_params.date_from.strftime(DATE_FORMAT),
-            "date_to": record_params.date_to.strftime(DATE_FORMAT),
-            "fpm": record_params.fpm,
-            "image_number": image_number
+        task_id = f'videos:{name}:{i}'
+
+        image_number = rec.calculate_workload()
+
+        db[task_id] = {
+            "comment": comment,
+            "rtsp_url": rtsp_url,
+            "date_from": interval['date_from'].strftime(DATE_FORMAT),
+            "date_to": interval['date_to'].strftime(DATE_FORMAT),
+            "fpm": fpm,
+            "image_number": image_number,
+            "status": "queued",
         }
-        json.dump(info, file)
-
-    record_video(video_path, record_params.rtsp_url, record_params.fpm / 60, image_number)
+        rec.start()
 
     return {
-        'date': (record_params.date_from, record_params.date_to)
+        'error': False
     }
 
 
 @app.get('/{name}')
 async def get_progress(name):
     video_path = os.path.join(VIDEO_PATH, name)
+    video_db_key = f'videos:{name}'
 
-    if os.path.exists(video_path):
-
-        with open(os.path.join(video_path, 'video_info.json'), 'r') as file:
-            video_info = json.load(file)
-            image_number = video_info['image_number']
-
-        return f'{count_images(video_path)}/{image_number}'
+    if os.path.exists(video_path) and db[video_db_key]:
+        return f'{count_images(video_path)}/' \
+               f'{db[video_db_key]["image_number"]}'
 
     return 'No such task is currently running.'
 

@@ -1,11 +1,14 @@
 import os
 
-import numpy as np
 import cv2
 
-from const import IMAGE_EXTENSIONS
+import pause
 
 from datetime import datetime
+from typing import Union
+import multiprocessing
+
+from const import IMAGE_EXTENSIONS
 
 
 def count_images(path: str) -> int:
@@ -14,22 +17,53 @@ def count_images(path: str) -> int:
     return len(image_files)
 
 
-def calculate_image_number(date1: datetime, date2: datetime, fpm: int) -> int:
-    return int((date2 - date1).seconds / 60 * fpm)
+def get_image_index(path: str) -> int:
+    files = os.listdir(path)
+    numbers = [int(file.split('.')[0]) for file in files]
+    return max(numbers) + 1 if len(files) > 0 else 0
 
 
-def record_video(dest: str, rtsp: str, fps: float, goal: int):
-    cap = cv2.VideoCapture(rtsp)
+class VideoRecorder(multiprocessing.Process):
+    def __init__(self, rtsp_string: str, video_path: str, start_date: datetime, end_date: datetime, fpm: Union[int, float]):
+        super().__init__()
+        self.rtsp = rtsp_string
 
-    camera_fps = cap.get(cv2.CAP_PROP_FPS)
+        self.path = video_path
 
-    for i in range(goal):
-        for _ in range(int(1 / fps * camera_fps)):
-            cap.grab()
+        self.begins = start_date
+        self.ends = end_date
 
-        ret, frame = cap.retrieve()
+        self.fps = fpm / 60
 
-        if ret:
-            cv2.imwrite(f'{dest}/{i}.jpeg', frame)
-        else:
-            print('VideoCapture returned something bad.')
+    def calculate_workload(self) -> int:
+        return int((self.ends - self.begins).seconds * self.fps)
+
+    def record(self):
+        print('Waiting...')
+        pause.until(self.begins)
+        print('Start!')
+
+        cap = cv2.VideoCapture(self.rtsp)
+
+        camera_fps = cap.get(cv2.CAP_PROP_FPS)
+
+        file_id = get_image_index(self.path)
+        while datetime.now() < self.ends:
+            for _ in range(int(1 / self.fps * camera_fps)):
+                cap.grab()
+
+            ret, frame = cap.retrieve()
+
+            if ret:
+                cv2.imwrite(f'{self.path}/{file_id}.jpeg', frame)
+            else:
+                print('VideoCapture returned something bad.')
+
+            file_id += 1
+        print('End.')
+        cap.read()
+        cap.release()
+
+    def run(self) -> None:
+        super().run()
+        self.record()
