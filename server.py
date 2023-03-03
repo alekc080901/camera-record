@@ -15,6 +15,7 @@ from const import VIDEO_PATH, DATE_FORMAT
 from video import count_images, VideoRecorder
 from database import db
 
+
 app = FastAPI()
 
 Path(VIDEO_PATH).mkdir(exist_ok=True)
@@ -50,15 +51,16 @@ async def record(video_params: VideoRecorderInput):
     Path(video_path).mkdir(exist_ok=True)
 
     for i, interval in enumerate(intervals):
+        task_id = f'videos:{name}:{i}'
+
         rec = VideoRecorder(
             rtsp_string=rtsp_url,
-            video_path=video_path,
+            name=name,
             fpm=fpm,
             start_date=interval['date_from'],
             end_date=interval['date_to'],
+            db_key=task_id,
         )
-
-        task_id = f'videos:{name}:{i}'
 
         image_number = rec.calculate_workload()
 
