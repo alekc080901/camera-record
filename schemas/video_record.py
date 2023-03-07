@@ -1,4 +1,4 @@
-import os
+import cv2
 
 from pydantic import BaseModel, validator, Field
 from typing import Dict, List
@@ -8,14 +8,29 @@ from transliterate import translit
 
 from database import db
 from const import VIDEO_PATH
+from directory_worker import DirectoryWorker
 
 
-def to_directory_friendly(string: str):
+def to_directory_friendly(string: str) -> str:
+    """
+    Переводит русское название в английское и заменяет пробелы нижним подчеркиванием.
+    :param string: Строка
+    :return: Обработанная строка
+    """
     string = string.replace(' ', '_')
     return translit(string, 'ru', reversed=True)
 
 
 class VideoRecorderInput(BaseModel):
+    """
+    JSON-схема post-запроса записи видео.
+    :param name: Идентификатор записи
+    :param comment: Комментарий к записи
+    :param rtsp_url: URL для подключения к камере
+    :param fpm: Количество кадров в минуту, записываемых камерой
+    :param intervals: Список временных промежутков (от и до), в которые необходимо производить запись у заданной
+    видеокамеры
+    """
     name: str = Field(..., max_length=100)
     comment: str = Field(..., max_length=500)
     rtsp_url: str = Field(..., max_length=200)
@@ -32,12 +47,12 @@ class VideoRecorderInput(BaseModel):
     @validator("name")
     def name_must_be_unique(cls, name):
         video_path = f'{VIDEO_PATH}/{to_directory_friendly(name)}'
-        if os.path.exists(video_path) or db.has(f'videos:{name}:*'):
+        if DirectoryWorker.exists(video_path) or db.has(f'videos:{name}:*'):
             raise ValueError(f'The name {name} has already been occupied!')
         return name
 
     @validator("rtsp_url")
     def correct_rtsp_url(cls, url):
-        if not url.startswith('rtsp://'):
-            raise ValueError(f'RTSP url must start with "rtsp://"! Got {url}.')
+        if not cv2.VideoCapture(url).isOpened():
+            raise ValueError(f"Couldn't connect via given rtsp url! Url: {url}")
         return url
