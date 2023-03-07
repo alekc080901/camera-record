@@ -55,6 +55,7 @@ class VideoRecorder(multiprocessing.Process):
     def _record_cycle(self):
         cap = cv2.VideoCapture(self.rtsp)
 
+
         if not cap.isOpened():
             raise cv2.error('Error on connection to camera!')
 
@@ -83,7 +84,7 @@ class VideoRecorder(multiprocessing.Process):
     def _images_to_video(self):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
-        writer = cv2.VideoWriter(f'{self.path}/{self.name}.mp4', fourcc, self.camera_fps, self.camera_res)
+        writer = cv2.VideoWriter(f'{self.path}/{self.name}.mp4', fourcc, self._camera_fps, self._camera_res)
 
         for filename in os.listdir(self.path):
             if filename.split('.')[-1] in IMAGE_EXTENSIONS:

@@ -15,6 +15,9 @@ class RedisConnection:
     def __setitem__(self, key, value):
         self._conn.set(key, json.dumps(value))
 
+    def has(self, pattern: str) -> bool:
+        return any(True for _ in self._conn.scan_iter(pattern))
+
     def change_video_status(self, key: str, status_value: Literal['queued', 'in_progress', 'failed', 'completed']):
         self._conn.set(key, status_value)
 
