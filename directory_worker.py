@@ -1,4 +1,7 @@
 import os
+import re
+
+from pathlib import Path
 
 from const import IMAGE_EXTENSIONS
 
@@ -8,6 +11,7 @@ class DirectoryWorker:
     """
     Статический класс, отвечает за получение информации и взаимодействие с файлами и директориями ОС
     """
+
     @staticmethod
     def exists(path: str) -> bool:
         return os.path.exists(path)
@@ -30,6 +34,10 @@ class DirectoryWorker:
         """
         filename_parts = filename.split('.')
         return filename_parts[-1] if len(filename_parts) > 1 else ''
+
+    @staticmethod
+    def extract_filename(path: str):
+        return os.path.basename(path)
 
     @staticmethod
     def is_image(filename: str) -> bool:
@@ -59,11 +67,11 @@ class DirectoryWorker:
         return len(DirectoryWorker.get_images(path))
 
     @staticmethod
-    def get_image_index(path: str) -> int:
+    def get_next_image_index(path: str) -> int:
         """
         Возвращает индекс последнего изображения в папке.
         :param path: Путь до папки с изображениями
-        :return: Индекс либо 0, если в папке нет изображений
+        :return: Индекс или 0, если в папке нет изображений
         """
         images = DirectoryWorker.get_images(path)
         numbers = [int(DirectoryWorker.get_filename(file)) for file in images]
@@ -78,3 +86,23 @@ class DirectoryWorker:
         """
         for filename in DirectoryWorker.get_images(path):
             os.remove(f'{path}/{filename}')
+
+    @staticmethod
+    def extract_directories(path: str):
+        dirs = re.split(r'/|\\', path)
+        dirs = dirs if Path(path).is_dir() else dirs[:-1]
+
+        prev_dir = ''
+        for i, d in enumerate(dirs):
+            dirs[i] = os.path.join(prev_dir, d).replace('\\', '/')
+            prev_dir = d
+
+        return dirs
+
+    @staticmethod
+    def change_extension(path: str, extension: str, rename_file=False):
+        new_path = f'{path[:path.rfind(".")]}.{extension}'
+
+        if rename_file and not os.path.exists(new_path):
+            os.rename(path, new_path)
+        return new_path

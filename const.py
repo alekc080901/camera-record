@@ -1,7 +1,16 @@
-VIDEO_PATH = 'videos'  # Take .gitignore into account
-
+VIDEO_EXTENSION = 'mp4'
+VIDEO_CODEC = 'mp4v'
 IMAGE_EXTENSIONS = ('.jpg', 'jpeg', 'png', 'tiff', 'bmp', 'webp')
+
+PUBSUB_VIDEO_CHANNEL_NAME = "video"
 
 DATE_FORMAT = '%d-%m-%Y %H:%M:%S'
 
 RECONNECT_DELAY_SECONDS = 10
+
+REDIS_SERVER = '127.0.0.1'
+REDIS_PORT = 6379
+REDIS_DB = 0
+
+CLOUD_ACCESS_TOKEN = 'y0_AgAAAABozHTHAAk_4QAAAADeJFp-eMrUe1UzSeO1WC5j1fDv0J8hT0A'  # ACCESS_TOKEN
+# портится через год
