@@ -8,9 +8,10 @@ from datetime import datetime
 from typing import Union
 import multiprocessing
 
-from const import RECONNECT_DELAY_SECONDS, VIDEO_EXTENSION, VIDEO_CODEC, PUBSUB_VIDEO_CHANNEL_NAME
-from directory_worker import DirectoryWorker
-from database import RedisConnection
+
+import directory_methods
+from src.const import RECONNECT_DELAY_SECONDS, VIDEO_EXTENSION, VIDEO_CODEC, PUBSUB_VIDEO_CHANNEL_NAME
+from src.database import RedisConnection
 
 
 class VideoRecorder(multiprocessing.Process):
@@ -65,7 +66,7 @@ class VideoRecorder(multiprocessing.Process):
         self._camera_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         # Запись происходит до назначенного времени
-        file_id = DirectoryWorker.get_next_image_index(self._path)
+        file_id = directory_methods.get_next_image_index(self._path)
         while datetime.now() < self._ends_at:
             filename = f'{self._path}/{file_id:10d}.jpeg'
             file_id += 1
@@ -111,7 +112,7 @@ class VideoRecorder(multiprocessing.Process):
             self._camera_fps,
             self._camera_res,
         )
-        for filename in DirectoryWorker.get_images(self._path):
+        for filename in directory_methods.get_images(self._path):
             path = f'{self._path}/{filename}'
             image = cv2.imread(path)
 
@@ -124,7 +125,7 @@ class VideoRecorder(multiprocessing.Process):
         Удаляет все изображения в директории.
         :return:
         """
-        DirectoryWorker.delete_images(self._path)
+        directory_methods.delete_images(self._path)
 
     def record(self):
         """
@@ -161,7 +162,7 @@ class VideoRecorder(multiprocessing.Process):
         # self._delete_images()
 
         # self._disk_queue.put(f'{self._path}/{self._video_name}')
-        self._db.publish(PUBSUB_VIDEO_CHANNEL_NAME, f'{self._path}/{self._video_name}')
+        # self._db.publish(PUBSUB_VIDEO_CHANNEL_NAME, f'{self._path}/{self._video_name}')
 
         self._db.change_video_status(self._db_key, 'completed')
 

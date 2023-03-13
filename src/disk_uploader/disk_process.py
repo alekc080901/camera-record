@@ -1,51 +1,12 @@
 import contextlib
-import json
 import multiprocessing
 import time
 
-import redis
 import yadisk
 
-from typing import Literal
-
-from directory_worker import DirectoryWorker
-from const import PUBSUB_VIDEO_CHANNEL_NAME
-
-
-class RedisConnection:
-    """
-    Подключение к базе данных Redis.
-    """
-    connection = None
-
-    def __new__(cls, *args, **kwargs):
-        if cls.connection is None:
-            cls.connection = super().__new__(cls)
-        return cls.connection
-
-    def __init__(self, host='127.0.0.1', port=6379, db_num=0):
-        self._r = redis.Redis(host=host, port=port, db=db_num)
-        self._connection = self
-
-    def __getitem__(self, item):
-        return json.loads(self._r.get(item))
-
-    def __setitem__(self, key, value):
-        self._r.set(key, json.dumps(value))
-
-    def has(self, pattern: str) -> bool:
-        return any(True for _ in self._r.scan_iter(pattern))
-
-    def change_video_status(self, key: str, status_value: Literal['queued', 'in_progress', 'gathering', 'completed']):
-        self._r.set(key, status_value)
-
-    def subscribe(self, channel: str):
-        p = self._r.pubsub()
-        p.subscribe(channel)
-        return p
-
-    def publish(self, channel: str, message: str):
-        self._r.publish(channel, message)
+import directory_methods
+from src.const import PUBSUB_VIDEO_CHANNEL_NAME
+from src.database import RedisConnection
 
 
 class DiskConnection(multiprocessing.Process):
@@ -69,15 +30,15 @@ class DiskConnection(multiprocessing.Process):
         return self._queue
 
     def upload(self, src_path: str, dest_path: str):
-        if not DirectoryWorker.exists(src_path):
+        if not directory_methods.exists(src_path):
             print('No video file found; cancel upload to cloud!')
             return
 
         self._mkdir_recursively(dest_path)
 
         try:
-            src_path = DirectoryWorker.change_extension(src_path, 'tmp', rename_file=True)
-            dest_path = DirectoryWorker.change_extension(dest_path, 'tmp')
+            src_path = directory_methods.change_extension(src_path, 'tmp', rename_file=True)
+            dest_path = directory_methods.change_extension(dest_path, 'tmp')
 
             with contextlib.suppress(yadisk.exceptions.PathExistsError):
                 self._conn.upload(
@@ -86,8 +47,8 @@ class DiskConnection(multiprocessing.Process):
                     overwrite=False,
                     n_retries=3
                 )
-                filename = DirectoryWorker.extract_filename(dest_path)
-                filename = DirectoryWorker.change_extension(filename, 'mp4')
+                filename = directory_methods.extract_filename(dest_path)
+                filename = directory_methods.change_extension(filename, 'mp4')
                 self._conn.rename(dest_path, filename)
 
         except (yadisk.exceptions.ConflictError, yadisk.exceptions.LockedError) as e:
@@ -95,13 +56,13 @@ class DiskConnection(multiprocessing.Process):
             print(e)
 
     def _mkdir_recursively(self, path: str):
-        dirs = DirectoryWorker.extract_directories(path)
+        dirs = directory_methods.extract_directories(path)
 
         for d in dirs:
             if not self._conn.exists(d):
                 self._conn.mkdir(d)
 
-    def _seek(self):  # sourcery skip: use-named-expression
+    def _seek(self):
         subscription = RedisConnection().subscribe(PUBSUB_VIDEO_CHANNEL_NAME)
         while True:
             # if video_path := self._queue.get():
@@ -130,5 +91,3 @@ class DiskConnection(multiprocessing.Process):
     @property
     def y_disk_is_run(self):
         return self.__y_disk_is_run
-
-RedisConnection()

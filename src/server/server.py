@@ -1,18 +1,16 @@
-import multiprocessing
-
 import uvicorn
-import yadisk
 
 from pathlib import Path
 
 from fastapi import FastAPI
 
-from const import DATE_FORMAT
-from schemas.record import VideoRecorderInput, to_directory_friendly
-from video_recording import VideoRecorder
-from directory_worker import DirectoryWorker
-from database import RedisConnection, DiskConnection
-from const import REDIS_SERVER, REDIS_PORT, REDIS_DB, CLOUD_ACCESS_TOKEN
+import directory_methods
+from src.const import DATE_FORMAT
+from src.server.schemas.record import VideoRecorderInput, to_directory_friendly
+from video_recorder.record_process import VideoRecorder
+from src.database import RedisConnection
+from src.disk_uploader.disk_process import DiskConnection
+from src.const import REDIS_SERVER, REDIS_PORT, REDIS_DB, CLOUD_ACCESS_TOKEN
 
 # queue = multiprocessing.Queue()
 
@@ -86,7 +84,7 @@ async def get_progress(name):
     video_db_key = f'videos:{name}:0'
 
     if redis_db[video_db_key]:
-        return f'{DirectoryWorker.count_images(redis_db[video_db_key]["path"])}/' \
+        return f'{directory_methods.count_images(redis_db[video_db_key]["path"])}/' \
                f'{redis_db[video_db_key]["image_number"]}'
 
     return 'No such task is currently running.'

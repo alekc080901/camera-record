@@ -6,9 +6,6 @@ from datetime import datetime
 
 from transliterate import translit
 
-from database import RedisConnection
-from directory_worker import DirectoryWorker
-
 
 def to_directory_friendly(string: str) -> str:
     """
