@@ -26,11 +26,27 @@ class RedisConnection:
     def __setitem__(self, key, value):
         self._r.set(key, json.dumps(value))
 
+    def get_all(self, pattern: str):
+        results = self._r.keys(pattern)
+        return [r.decode('utf-8') for r in results]
+
     def has(self, pattern: str) -> bool:
         return any(True for _ in self._r.scan_iter(pattern))
 
     def change_video_status(self, key: str, status_value: Literal['queued', 'in_progress', 'gathering', 'completed']):
-        self._r.set(key, status_value)
+        content = self[key]
+        content['status'] = status_value
+        self[key] = content
+
+    def drop_statuses(self, default: Literal['queued', 'in_progress', 'gathering', 'completed'] = 'queued'):
+        keys = self._r.keys('*')
+        for key in keys:
+            val = self[key]
+
+            if isinstance(val, dict) and 'status' in val:
+                val['status'] = default
+
+            self[key] = val
 
     def subscribe(self, channel: str):
         p = self._r.pubsub()

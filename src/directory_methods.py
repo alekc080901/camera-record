@@ -3,6 +3,8 @@ import re
 
 from pathlib import Path
 
+from transliterate import translit
+
 from src.const import IMAGE_EXTENSIONS
 
     
@@ -110,3 +112,17 @@ def create_copy_of_filename(path: str) -> str:
     extension = get_extension(path)
     directory = os.path.dirname(path)
     return os.path.join(directory, f'{filename}.{extension}').replace('\\', '/')
+
+
+def to_directory_friendly(string: str) -> str:
+    """
+    Переводит русское название в английское и заменяет пробелы нижним подчеркиванием.
+    :param string: Строка
+    :return: Обработанная строка
+    """
+    string = string.replace(' ', '_')
+    return translit(string, 'ru', reversed=True)
+
+
+def mkdir(path: str):
+    Path(path).mkdir(parents=True, exist_ok=True)

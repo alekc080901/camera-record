@@ -5,6 +5,9 @@ IMAGE_EXTENSIONS = ('.jpg', 'jpeg', 'png', 'tiff', 'bmp', 'webp')
 PUBSUB_VIDEO_CHANNEL_NAME = "video"
 
 DATE_FORMAT = '%d-%m-%Y %H:%M:%S'
+TIME_FORMAT = '%H-%M'
+
+DATA_RANGE_INTERVAL_IN_MINUTES = 1
 
 RECONNECT_DELAY_SECONDS = 10
 

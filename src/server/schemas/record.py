@@ -4,18 +4,6 @@ from pydantic import BaseModel, validator, Field
 from typing import Dict, List
 from datetime import datetime
 
-from transliterate import translit
-
-
-def to_directory_friendly(string: str) -> str:
-    """
-    Переводит русское название в английское и заменяет пробелы нижним подчеркиванием.
-    :param string: Строка
-    :return: Обработанная строка
-    """
-    string = string.replace(' ', '_')
-    return translit(string, 'ru', reversed=True)
-
 
 class VideoRecorderInput(BaseModel):
     """
@@ -59,3 +47,15 @@ class VideoRecorderInput(BaseModel):
     @validator("path")
     def correct_path(cls, path):
         return path.strip('/\\')
+
+    @validator("intervals")
+    def correct_intervals(cls, intervals):
+        for interval in intervals:
+
+            if len(interval.keys()) != 2:
+                raise ValueError("Wrong number of keys in interval!")
+
+            if 'date_from' not in interval or 'date_to' not in interval:
+                raise ValueError("Some keys missing in interval!")
+
+        return intervals

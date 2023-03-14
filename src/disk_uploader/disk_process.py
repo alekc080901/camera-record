@@ -5,7 +5,7 @@ import time
 import yadisk
 
 import directory_methods
-from src.const import PUBSUB_VIDEO_CHANNEL_NAME
+from src.const import PUBSUB_VIDEO_CHANNEL_NAME, VIDEO_EXTENSION
 from src.database import RedisConnection
 
 
@@ -41,7 +41,7 @@ class DiskConnection(multiprocessing.Process):
                     n_retries=3
                 )
                 filename = directory_methods.extract_filename(dest_path)
-                filename = directory_methods.change_extension(filename, 'mp4')
+                filename = directory_methods.change_extension(filename, VIDEO_EXTENSION)
                 self._conn.rename(dest_path, filename)
 
         except (yadisk.exceptions.ConflictError, yadisk.exceptions.LockedError) as e:
