@@ -24,11 +24,6 @@ app = FastAPI()
 
 @app.post('/')
 async def start_record(video_params: VideoRecorderInput):
-    # yandex_disk = DiskConnection(token=CLOUD_ACCESS_TOKEN)
-    # if not yandex_disk.y_disk_is_run:
-    #     print('+')
-    #     yandex_disk.start()
-
     """
     Post-запрос для записи видео. См. VideoRecorderInput для списка параметров.
     :param video_params: Входные данные для записи, извлекаемые из json-объекта тела запроса

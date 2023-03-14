@@ -1,5 +1,5 @@
-VIDEO_EXTENSION = 'mp4'
-VIDEO_CODEC = 'mp4v'
+VIDEO_EXTENSION = 'mkv'
+VIDEO_CODEC = 'h264'
 IMAGE_EXTENSIONS = ('.jpg', 'jpeg', 'png', 'tiff', 'bmp', 'webp')
 
 PUBSUB_VIDEO_CHANNEL_NAME = "video"

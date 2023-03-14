@@ -12,6 +12,7 @@ import multiprocessing
 import directory_methods
 from src.const import RECONNECT_DELAY_SECONDS, VIDEO_EXTENSION, VIDEO_CODEC, PUBSUB_VIDEO_CHANNEL_NAME
 from src.database import RedisConnection
+from src.video_recorder.video_writer_manager import VideoWriterManager
 
 
 class VideoRecorder(multiprocessing.Process):
@@ -44,15 +45,7 @@ class VideoRecorder(multiprocessing.Process):
 
         self._db = None
         self._db_key = db_key
-        # self._disk_queue = disk_queue
-
-    def calculate_workload(self) -> int:
-        """
-        Расчет предполагаемого количества изображений в записи от начала до конца видеосъемки.
-        :return: Количество кадров
-        """
-        # TODO: Глупая идея. Избавиться
-        return int((self._ends_at - self._begins_at).seconds * self._fps)
+        self._fourcc = cv2.VideoWriter_fourcc(*f'{VIDEO_CODEC}')
 
     def _record_cycle(self):
         """
@@ -65,10 +58,16 @@ class VideoRecorder(multiprocessing.Process):
         self._camera_fps = cap.get(cv2.CAP_PROP_FPS)
         self._camera_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+        writer = VideoWriterManager(
+            writer_path=f'{self._path}/{self._video_name}',
+            codec=self._fourcc,
+            fps=self._camera_fps,
+            resolution=self._camera_res,
+        )
+
         # Запись происходит до назначенного времени
         file_id = directory_methods.get_next_image_index(self._path)
         while datetime.now() < self._ends_at:
-            filename = f'{self._path}/{file_id:10d}.jpeg'
             file_id += 1
 
             # Пропуск кадров, если необходимо (задан fps меньше fps камеры)
@@ -81,56 +80,19 @@ class VideoRecorder(multiprocessing.Process):
                 print('Error while retrieving image!')
                 return -1
 
-            im_written = cv2.imwrite(filename, frame)
-
-            if not im_written:
-                print('Error while writing image!')
-                return -1
+            writer.write(frame)
 
         cap.read()
         cap.release()
-        time.sleep(1)
-        return 0
-
-    def _write_images_in_video(self):
-        """
-        Собирает все изображения в директории в одно видео формата .mp4. Предполагается, что
-        изображения в директории уже отсортированы.
-        :return:
-        """
-        # Подсчет параметров камеры (если запись не производилась, но изображения в директории есть)
-        if self._camera_fps is None or self._camera_res is None:
-            cap = cv2.VideoCapture(self._rtsp)
-            self._camera_fps = cap.get(cv2.CAP_PROP_FPS)
-            self._camera_res = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        fourcc = cv2.VideoWriter_fourcc(*f'{VIDEO_CODEC}')
-
-        writer = cv2.VideoWriter(
-            f'{self._path}/{self._video_name}',
-            fourcc,
-            self._camera_fps,
-            self._camera_res,
-        )
-        for filename in directory_methods.get_images(self._path):
-            path = f'{self._path}/{filename}'
-            image = cv2.imread(path)
-
-            writer.write(image)
-
         writer.release()
-
-    def _delete_all_images(self):
-        """
-        Удаляет все изображения в директории.
-        :return:
-        """
-        directory_methods.delete_images(self._path)
+        time.sleep(2)
+        return 0
 
     def record(self):
         """
-        Непосредственно процесс записи. Запись начинается с определенного момента времени (self.begins) и заканчивается
-        в определенный момент времени (self.ends).
+        Непосредственно процесс записи.
+        Запись начинается с определенного момента времени (self.begins_at) и заканчивается
+        в определенный момент времени (self.ends_at).
         :return:
         """
         print('Waiting...')
@@ -157,11 +119,6 @@ class VideoRecorder(multiprocessing.Process):
 
         self._db.change_video_status(self._db_key, 'gathering')
 
-        print('Transforming to video...')
-        self._write_images_in_video()
-        # self._delete_images()
-
-        # self._disk_queue.put(f'{self._path}/{self._video_name}')
         # self._db.publish(PUBSUB_VIDEO_CHANNEL_NAME, f'{self._path}/{self._video_name}')
 
         self._db.change_video_status(self._db_key, 'completed')

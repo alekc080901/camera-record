@@ -99,3 +99,14 @@ def change_extension(path: str, extension: str, rename_file=False):
     if rename_file and not os.path.exists(new_path):
         os.rename(path, new_path)
     return new_path
+
+
+def rename(old_path: str, new_path: str):
+    os.replace(old_path, new_path)
+
+
+def create_copy_of_filename(path: str) -> str:
+    filename = f'{get_filename(extract_filename(path))}_'
+    extension = get_extension(path)
+    directory = os.path.dirname(path)
+    return os.path.join(directory, f'{filename}.{extension}').replace('\\', '/')
