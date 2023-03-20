@@ -1,24 +1,27 @@
 import uvicorn
 
-from src.database import RedisConnection
-from src.disk_uploader.disk_process import DiskConnection
-from const import REDIS_SERVER, REDIS_PORT, REDIS_DB, CLOUD_ACCESS_TOKEN
-from src.video_recorder.regular_record_timer import RegularRecording
+from server.database import RedisConnection
+from server.disk_uploader.disk_process import DiskConnection
+from server.const import REDIS_SERVER, REDIS_PORT, REDIS_DB, CLOUD_ACCESS_TOKEN
+from server.video_recorder.record_launcher import RecordManager
 
 
 def main():
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
 
     yandex_disk = DiskConnection(token=CLOUD_ACCESS_TOKEN)
-    redis_db.drop_statuses()
+    # redis_db.reset_tasks()
 
-    regular_recorder = RegularRecording()
+    recorder = RecordManager()
 
-    regular_recorder.start()
+    recorder.start()
     yandex_disk.start()
 
-    uvicorn.run('server:app', host="127.0.0.1", reload=True, port=8888)
+    uvicorn.run('server.server.views:app', host="127.0.0.1", reload=False, port=8000)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Server stop")
