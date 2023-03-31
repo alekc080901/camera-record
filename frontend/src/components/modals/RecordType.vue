@@ -1,48 +1,54 @@
 <template>
-<BaseModal>
+<GDialog>
     <template #activator="{ onClick }">
-        <RecordButton class="add-button" img="./assets/logo.svg" :size="{width: 100, height:100}" @click="onClick" />
+        <RecordButton class="add-button" @click="onClick" />
     </template>
-    <template v-slot:header>
-        <h3 >Тип записи</h3>
-    </template>
-    <template v-slot:test="{ onClose }">
-        <button @click="this.test(onClodse)">жопа</button>
-    </template>
-    <template v-slot:body>
-        <div class="container">
+    <template #default="{onClose}">
+        <ModalToolbar msg="Тип записи" @close="onClose"/>
+        
+        <div class="container p-4">
             <div class="row">
                 <AddRecordModal/>
-                <AddRecordModal/>
+                <AddRegularRecordModal/>
             </div>
         </div>
-
     </template>
-</BaseModal>
+    
+</GDialog>
 </template>
 
 <script>
-import Base from './Base.vue';
 import AddRecord from './AddRecord.vue';
+import AddRegularRecord from './AddRegularRecord.vue';
 import RecordButton from '../buttons/RecordButton.vue';
+import 'gitart-vue-dialog/dist/style.css'
+import {
+    GDialog
+} from 'gitart-vue-dialog'
+import ModalToolbar from './ModalToolbar.vue'
 
 export default {
-    name: 'ModalFrame',
+    name: 'RecordType',
     components: {
-        BaseModal: Base,
+        ModalToolbar,
+        GDialog,
         AddRecordModal: AddRecord,
+        AddRegularRecordModal: AddRegularRecord,
         RecordButton,
-    },
-    methods: {
-        test(arg) {
-            console.log(arg)
-        }
     }
 };
 </script>
 
-<style scoped>
-h3 {
-    text-align: center;
+<style>
+.add-button {
+    width: 100px;
+    height: 100px;
+    cursor: pointer;
+}
+
+.record-type {
+    width: 200px;
+    height: 135px;
+    cursor: pointer;
 }
 </style>

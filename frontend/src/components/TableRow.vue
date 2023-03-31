@@ -2,6 +2,7 @@
 <tr>
     <td>{{ id + 1 }}</td>
     <td>{{ data.name }}</td>
+    <td>{{ type}}</td>
     <td>{{ progress }}%</td>
     <td>{{ data.path }}</td>
     <td>{{ status }}</td>
@@ -24,6 +25,13 @@ export default {
                 'error': 'Переподключение...',
             }
             return statuses[this.data.status]
+        },
+        type() {
+            const types = {
+                'delayed': 'Отложенный',
+                'regular': 'Регулярный',
+            }
+            return types[this.data.type]
         },
         progress() {
             const now = new Date();

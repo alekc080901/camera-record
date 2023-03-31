@@ -57,10 +57,15 @@ class VideoRecorder(multiprocessing.Process):
     def _generate_date_ranges(self):
         delta = timedelta(minutes=DATA_RANGE_INTERVAL_IN_MINUTES)
 
-        item = datetime.now()
+        item = self._begins_at
         while item < self._ends_at:
             item += delta
             yield min(item, self._ends_at)
+
+    def _get_nearest_range(self):
+        date_ranges = self._generate_date_ranges()
+        date_ranges = [r for r in date_ranges if datetime.now() < r]
+        return date_ranges[0]
 
     def _record_cycle(self, end_date: datetime):
         """
@@ -87,7 +92,6 @@ class VideoRecorder(multiprocessing.Process):
                 return -1
 
             self.writer.write(frame)
-
         self.cap.release()
         time.sleep(2)
         return 0
@@ -113,29 +117,27 @@ class VideoRecorder(multiprocessing.Process):
                 handle_error(msg='Reconnecting to camera...')
                 continue
 
-            for date in self._generate_date_ranges():
-                filename = f'{date.strftime(TIME_FORMAT)}.{VIDEO_EXTENSION}'
+            date = self._get_nearest_range()
+            filename = f'{date.strftime(TIME_FORMAT)}.{VIDEO_EXTENSION}'
 
-                # Данная странная конструкция служит для перезапуска процесса записи изображений в случае ошибки
-                # Перезапуск производится с задержкой.
-                # Стоит учитывать, что неудачное подключение к камере также занимает время.
-                self.writer = VideoWriterManager(
-                    writer_path=f'{self._path}/{filename}',
-                    fps=self._camera_fps,
-                    resolution=self._camera_res,
-                )
+            self.writer = VideoWriterManager(
+                writer_path=f'{self._path}/{filename}',
+                fps=self._camera_fps,
+                resolution=self._camera_res,
+            )
 
-                try:
-                    print(date)
-                    while self._record_cycle(date) != 0:
-                        handle_error(msg='Reconnecting...')
-                    break
-                except Exception as e:
-                    print(e)
-                    handle_error(msg='Reconnecting to camera...')
-                    self.writer.release()
-                    continue
-            # self._db.publish(PUBSUB_VIDEO_CHANNEL_NAME, f'{self._path}/{filename}')
+            try:
+                print(date)
+                while self._record_cycle(date) != 0:
+                    handle_error(msg='Reconnecting...')
+            except Exception as e:
+                print(e)
+                handle_error(msg='Reconnecting to camera...')
+                self.writer.release()
+                continue
+
+            self._db.publish(PUBSUB_VIDEO_CHANNEL_NAME, f'{self._path}/{filename}')
+            break
 
         self._db.change_record_status(self._db_key, 'completed')
         print('End')

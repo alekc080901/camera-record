@@ -3,5 +3,8 @@ import 'bootstrap'
 
 import { createApp } from 'vue'
 import App from './App.vue'
+import { plugin as dialogPlugin } from 'gitart-vue-dialog'
 
-createApp(App).mount('#app')
+createApp(App)
+.use(dialogPlugin)
+.mount('#app')

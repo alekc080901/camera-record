@@ -10,13 +10,17 @@
   "dependencies": {
     "@kouts/vue-modal": "^2.1.11",
     "@popperjs/core": "^2.11.6",
+    "@vuepic/vue-datepicker": "^4.2.2",
     "bootstrap": "^5.2.3",
     "core-js": "^3.8.3",
     "gitart-vue-dialog": "^2.4.1",
     "jenesius-vue-modal": "^1.8.2",
     "jquery": "^3.6.4",
+    "luxon": "^3.3.0",
     "popper.js": "^1.16.1",
-    "vue": "^3.2.13"
+    "vue": "^3.2.13",
+    "vue-drumroll-datetime-picker": "^1.0.5",
+    "vue-luxon": "^0.10.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",

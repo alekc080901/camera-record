@@ -4,6 +4,7 @@
         <tr>
             <th scope="col">#</th>
             <th scope="col">Название</th>
+            <th scope="col">Тип</th>
             <th scope="col">Прогресс</th>
             <th scope="col">Директория</th>
             <th scope="col">Статус</th>
@@ -12,6 +13,9 @@
 
     <TableRow v-for="(task, index) in allTasks" :key="index" :id="index" :data="task" />
 </table>
+<div v-if="loadError" style="white-space: pre-line" class="alert alert-danger" role="alert">
+    {{ loadErrorMessage }}
+</div>
 </template>
 
 <script>
@@ -27,6 +31,9 @@ export default {
         return {
             regularTasks: [],
             delayedTasks: [],
+
+            loadError: false,
+            loadErrorMessage: '',
         }
     },
 
@@ -37,9 +44,10 @@ export default {
     },
 
     methods: {
-        parseRecord(record) {
+        parseDelayedRecord(record) {
             return {
                 name: record.name,
+                type: 'delayed',
                 path: record.path,
                 comment: record.comment,
                 rtsp: record.rtsp_url,
@@ -48,7 +56,20 @@ export default {
                 fpm: record.fpm,
                 status: record.status,
             }
-        }
+        },
+        parseRegularRecord(record) {
+            return {
+                name: record.name,
+                type: 'regular',
+                path: record.path,
+                comment: record.comment,
+                rtsp: record.rtsp_url,
+                startsAt: new Date(record.time_from),
+                endsAt: new Date(record.time_to),
+                fpm: record.fpm,
+                status: record.status,
+            }
+        },
     },
 
     mounted() {
@@ -58,14 +79,27 @@ export default {
                     'Accept': 'application/json',
                 }
             })
-            .then(response => response.json())
+            .then(async response => {
+                if (response.status >= 200 && response.status < 300) {
+                    this.formSendError = false;
+                    return response.json();
+                }
+                let error = new Error();
+                error.response = response;
+                throw error;
+            })
             .then(commits => commits)
             .then(({
                 records,
                 regularRecords
             }) => {
-                this.delayedTasks = Object.values(records).map(this.parseRecord);
-                this.regularTasks = Object.values(regularRecords).map(this.parseRecord);
+                this.delayedTasks = Object.values(records).map(rec => this.parseDelayedRecord(rec));
+                this.regularTasks = Object.values(regularRecords).map(rec => this.parseRegularRecord(rec));
+            })
+            .catch(e => {
+                this.loadError = true;
+                this.loadErrorMessage = e.response === undefined ? 'Невозможно подключиться к серверу' :
+                    `${e.response.status} ${e.response.statusText}`;
             })
     }
 }

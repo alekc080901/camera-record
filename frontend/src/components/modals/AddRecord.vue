@@ -1,60 +1,189 @@
 <template>
-<BaseModal>
-    <template #test="{ onClose }">
-        <button @click="onClose">Не тестик</button>
+<GDialog>
+    <template #activator="{ onClick }">
+        <img class="record-type" :src="require('@/assets/delayed.png')" @click="onClick" />
     </template>
-     <template #activator="{ onClick }">
-        <RecordButton class="col" img="./assets/logo.svg" :size="{width: 110, height:110}" @click="onClick"/>
-    </template>
-    <!--<template v-slot:header>
-        <h3>Добавление отложенной записи</h3>
-    </template>
-    <template #body="{ onClose }">
-        <form>
+
+    <template #default="{ onClose }">
+        <ModalToolbar msg="Добавление отложенной записи" @close="onClose" />
+        <form class="add-form" name="add-delayed" @submit="sendForm">
             <div class="container mb-3">
                 <div class="form-group m-2">
                     <label for="record-name">Название записи</label>
-                    <input type="text" class="form-control" id="record-name" placeholder="Олег" required>
+                    <input type="text" name="name" title="name" class="form-control" id="record-name" placeholder="Олег" required>
                 </div>
                 <div class="form-group m-2">
                     <label for="record-rtsp">RTSP</label>
-                    <input type="text" class="form-control" id="record-rtsp" placeholder="rtsp://" required>
+                    <input type="text" name="rtsp" title="rtsp" class="form-control" id="record-rtsp" placeholder="rtsp://" required>
+                </div>
+                <div class="form-group m-2">
+                    <label for="record-rtsp">Директория</label>
+                    <input type="text" name="path" title="directory" class="form-control" id="record-path" placeholder="videos/Friday" required>
                 </div>
                 <div class="form-group m-2">
                     <label for="record-fpm">Кадров в минуту</label>
-                    <input type="number" class="form-control" id="record-fpm" placeholder="1200" required>
+                    <input type="number" name="fpm" title="fpm" class="form-control" id="record-fpm" placeholder="1200" required>
                 </div>
                 <div class="form-group m-2 mb-3">
                     <label for="record-comment">Комментарий</label>
-                    <textarea class="form-control" id="record-comment" rows="2" placeholder="Текст комментария"></textarea>
+                    <textarea class="form-control" name="comment" title="comment" id="record-comment" rows="2" placeholder="Текст комментария"></textarea>
                 </div>
 
-                <div class="row">
-                    <button class="col btn btn-primary m-2" type="submit" >Начать запись</button>
+                <div class="form-group m-2 mb-3">
+                    <label for="record-date-0">Дата</label>
+                    <div class="dates">
+                        <div class="date-input" v-for="(_, id) in dateComponents" :key="id">
+                            <DateTimeInput class="mb-2" name="date" :id="`record-date-${id}}`" />
+                            <RemoveButton class="button-delete" :id="`del-${id}`" @click="removeDateInput" />
+                        </div>
+                        <AddButton class="button-add" @click="addNewDateInput" />
+                    </div>
+                </div>
+
+                <div class="row m-2">
+                    <button class="col btn btn-primary m-2" type="submit">Начать запись</button>
                     <button class="col btn btn-secondary m-2" type="button" @click="onClose">Отмена</button>
                 </div>
-                
+
+                <div v-if="formSendError" style="white-space: pre-line" class="alert alert-danger" role="alert">
+                    {{ formSendErrorMessage }}
+                </div>
             </div>
         </form>
-    </template> -->
-</BaseModal>
+    </template>
+</GDialog>
 </template>
 
 <script>
-import Base from './Base.vue';
-import RecordButton from '../buttons/RecordButton.vue';
+import ModalToolbar from './ModalToolbar.vue';
+import DateTimeInput from '../inputs/DateTimeInput.vue';
+import AddButton from '../buttons/AddButton.vue';
+import RemoveButton from '../buttons/RemoveButton.vue';
+
+import 'gitart-vue-dialog/dist/style.css'
+import {
+    GDialog
+} from 'gitart-vue-dialog'
 
 export default {
-    name: 'ModalFrame',
+    name: 'AddRecord',
     components: {
-        BaseModal: Base,
-        RecordButton,
+        GDialog,
+        ModalToolbar,
+        DateTimeInput,
+        AddButton,
+        RemoveButton,
+    },
+    data() {
+        return {
+            count: 0,
+            dateComponents: [0],
+
+            formSendError: false,
+            formSendErrorMessage: '',
+        }
+    },
+    methods: {
+        addNewDateInput() {
+            this.count++;
+            this.dateComponents.push(this.count);
+        },
+        removeDateInput(e) {
+            if (this.dateComponents.length <= 1)
+                return
+
+            const inputIdx = Number(e.target.id.split('-').at(-1));
+            this.dateComponents = this.dateComponents.filter((e) => e !== inputIdx);
+        },
+
+        considerTimezone(date) {
+            const hoursDiff = date.getHours() - date.getTimezoneOffset() / 60;
+            date.setHours(hoursDiff);
+            return date;
+        },
+        parseDateRange(dateString) {
+            const parseDate = (datetime) => {
+                const [date, time] = datetime.split(', ')
+                const [day, month, year] = date.split('-');
+                const [hours, minutes] = time.split(':')
+
+                return new Date(+year, +month - 1, +day, +hours, +minutes)
+            }
+
+            const [dateFrom, dateTo] = dateString.split(' – ')
+            return {
+                date_from: this.considerTimezone(parseDate(dateFrom)).toISOString(),
+                date_to: this.considerTimezone(parseDate(dateTo)).toISOString(),
+            }
+        },
+        getDates(form) {
+            const dates = form.date;
+            if (dates.constructor === HTMLInputElement)
+                return [this.parseDateRange(dates.value)];
+
+            return [...dates].map(e => this.parseDateRange(e.value));
+        },
+        async sendForm(e) {
+            e.preventDefault();
+            const form = document.forms['add-delayed'];
+            const jsonBody = {
+                name: form.name.value,
+                rtsp_url: form.rtsp.value,
+                comment: form.comment.value,
+                fpm: form.fpm.value,
+                path: form.path.value,
+                intervals: this.getDates(form),
+            }
+
+            await fetch('http://127.0.0.1:8000/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(jsonBody),
+                })
+                .then(async response => {
+                    if (response.status >= 200 && response.status < 300) {
+                        this.formSendError = false;
+                        window.location.reload();
+                        return response.json();
+                    }
+                    let error = response.status === 422 ?
+                        new Error(JSON.stringify((await response.json())['detail'][0], null, 2)) :
+                        new Error();
+                    error.response = response;
+                    throw error;
+                })
+                .catch(e => {
+                    console.log(e);
+                    this.formSendError = true;
+                    this.formSendErrorMessage = e.response === undefined ? 'Невозможно подключиться к серверу' :
+                        `${e.response.status} ${e.response.statusText}\n${e.message}`;
+                })
+        }
     }
 };
 </script>
 
 <style scoped>
-h3 {
-    text-align: center;
+.date-input {
+    display: flex;
+    flex-direction: row;
+    position: relative;
+}
+
+.dp__theme_light {
+    --dp-border-color: #ced4da;
+}
+
+.dates {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    justify-items: center;
+}
+
+.button-add {
+    align-self: center;
 }
 </style>
