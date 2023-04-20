@@ -4,9 +4,9 @@ import time as time_
 from datetime import datetime, timedelta, time
 
 import server.directory_methods as directory_methods
-from server.video_recorder.record_process import VideoRecorder
 from server.database import RedisConnection
 from server.const import DATE_FORMAT
+from server.video_recorder.record_factory import create_recorder
 
 
 def str_to_time(time_str: str) -> time:
@@ -36,10 +36,12 @@ class RecordLauncher:
                 return task, info
 
     @staticmethod
-    def start_record_process(key: str, name: str, rtsp: str, path: str, fpm: int, today: datetime, end_date: datetime):
+    def start_record_process(key: str, name: str, rtsp: str, path: str, fpm: int, today: datetime, end_date: datetime,
+                             with_audio=False):
         start_date = today
 
-        process = VideoRecorder(
+        process = create_recorder(
+            audio=with_audio,
             rtsp_string=rtsp,
             name=name,
             path=path,
@@ -80,13 +82,15 @@ class RegularRecordLauncher:
                 return task, info
 
     @staticmethod
-    def start_record_process(key: str, name: str, rtsp: str, path: str, fpm: int, today: datetime, end_time: time):
+    def start_record_process(key: str, name: str, rtsp: str, path: str, fpm: int, today: datetime, end_time: time,
+                             with_audio=False):
         start = datetime(today.year, today.month, today.day, today.hour, today.minute, today.second)
 
         tmp = start + timedelta(days=1) if end_time < start.time() else start
         end = datetime(tmp.year, tmp.month, tmp.day, end_time.hour, end_time.minute, end_time.second)
 
-        process = VideoRecorder(
+        process = create_recorder(
+            audio=with_audio,
             rtsp_string=rtsp,
             name=name,
             path=path,
@@ -124,7 +128,7 @@ class RecordManager(multiprocessing.Process):
                     rtsp=info['rtsp_url'],
                     today=now,
                     end_time=str_to_time(info['time_to']),
-
+                    with_audio=info['with_audio'],
                 )
                 db.init_task(key)
                 continue
@@ -141,6 +145,7 @@ class RecordManager(multiprocessing.Process):
                     rtsp=info['rtsp_url'],
                     today=now,
                     end_date=str_to_datetime(info['date_to']),
+                    with_audio=info['with_audio'],
                 )
                 db.init_task(key)
                 continue

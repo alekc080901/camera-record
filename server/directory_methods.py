@@ -90,12 +90,15 @@ def extract_directories(path: str):
     prev_dir = ''
     for i, d in enumerate(dirs):
         dirs[i] = os.path.join(prev_dir, d).replace('\\', '/')
-        prev_dir = d
+        prev_dir = dirs[i]
 
     return dirs
 
 
 def change_extension(path: str, extension: str, rename_file=False):
+    if os.path.isdir(path):
+        return
+
     new_path = f'{path[:path.rfind(".")]}.{extension}'
 
     if rename_file and not os.path.exists(new_path):

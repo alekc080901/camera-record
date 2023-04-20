@@ -1,3 +1,4 @@
+import contextlib
 import time
 
 import cv2
@@ -6,10 +7,9 @@ from datetime import datetime, timedelta
 from typing import Union
 import multiprocessing
 
-
 import server.directory_methods as directory_methods
-from server.const import RECONNECT_DELAY_SECONDS, VIDEO_EXTENSION, VIDEO_CODEC, \
-    PUBSUB_VIDEO_CHANNEL_NAME, DATA_RANGE_INTERVAL_IN_MINUTES, DATE_FORMAT, TIME_FORMAT
+from server.const import RECONNECT_DELAY_SECONDS, VIDEO_EXTENSION, \
+    PUBSUB_VIDEO_CHANNEL_NAME, DATA_RANGE_INTERVAL_IN_MINUTES
 from server.database import RedisConnection
 from server.video_recorder.video_writer_manager import VideoWriterManager
 
@@ -25,8 +25,8 @@ class VideoRecorder(multiprocessing.Process):
     :param db_key: Идентификатор записи в базе данных
     """
 
-    def __init__(self, rtsp_string: str, name: str, path: str, start_date: datetime, end_date: datetime,
-                 fpm: Union[int, float], db_key: str, status_on_complete='completed'):
+    def __init__(self, rtsp_string: str, name: str, path: str, start_date: datetime, end_date: datetime, db_key: str,
+                 fpm: Union[int, float] = None):
         super().__init__()
         self._rtsp = rtsp_string
 
@@ -36,7 +36,7 @@ class VideoRecorder(multiprocessing.Process):
         self._begins_at = start_date
         self._ends_at = end_date
 
-        self._fps = fpm / 60
+        self._fps = None if fpm is None else fpm / 60
 
         self._camera_fps = None
         self._camera_res = None
@@ -44,15 +44,22 @@ class VideoRecorder(multiprocessing.Process):
         self._db = None
         self._db_key = db_key
 
-        self.cap = None
-        self.writer = None
+        self._cap = None
+        self._writer = None
 
     def _connect_to_camera(self):
-        self.cap = cv2.VideoCapture(self._rtsp)
+        try:
+            self._cap = cv2.VideoCapture(self._rtsp)
 
-        # Параметры камеры
-        self._camera_fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self._camera_res = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            # Параметры камеры
+            self._camera_fps = self._cap.get(cv2.CAP_PROP_FPS)
+            self._camera_res = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(
+                self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+            return self._cap.isOpened()
+        except Exception as e:
+            print(f'Can\'t connect to a camera! ({self._name})')
+            return False
 
     def _generate_date_ranges(self):
         delta = timedelta(minutes=DATA_RANGE_INTERVAL_IN_MINUTES)
@@ -62,16 +69,12 @@ class VideoRecorder(multiprocessing.Process):
             item += delta
             yield min(item, self._ends_at)
 
-    def _get_nearest_range(self):
-        date_ranges = self._generate_date_ranges()
-        date_ranges = [r for r in date_ranges if datetime.now() < r]
-        return date_ranges[0]
-
     def _record_cycle(self, end_date: datetime):
         """
         Один цикл записи.
         :return: 0 в случае успеха. -1 в случае ошибки.
         """
+        self._db.change_record_status(self._db_key, 'in_progress')
 
         # Запись происходит до назначенного времени
         file_id = directory_methods.get_next_image_index(self._path)
@@ -81,20 +84,31 @@ class VideoRecorder(multiprocessing.Process):
             file_id += 1
 
             i += 1
+
             # Пропуск кадров, если необходимо (задан fps меньше fps камеры)
             for _ in range(int(1 / self._fps * self._camera_fps)):
-                self.cap.grab()
+                self._cap.grab()
 
-            ret, frame = self.cap.retrieve()
+            ret, frame = self._cap.retrieve()
 
             if not ret:
                 print('Error while retrieving image!')
                 return -1
 
-            self.writer.write(frame)
-        self.cap.release()
+            self._writer.write(frame)
+        self._cap.release()
         time.sleep(2)
         return 0
+
+    def _run_cycle(self, end_date):
+        self._connect_to_camera()
+
+        if self._fps is None:
+            self._fps = self._camera_fps
+
+        with contextlib.suppress(Exception):
+            res = self._record_cycle(end_date)
+            return res if res != -1 else None
 
     def record(self):
         """
@@ -103,43 +117,35 @@ class VideoRecorder(multiprocessing.Process):
         в определенный момент времени (self.ends_at).
         :return:
         """
-        def handle_error(msg: str):
-            print(msg)
-            self._db.change_record_status(self._db_key, 'error')
-            time.sleep(RECONNECT_DELAY_SECONDS)
-
         self._db = RedisConnection()
 
-        while True:
-            try:
-                self._connect_to_camera()
-            except Exception as e:
-                handle_error(msg='Reconnecting to camera...')
-                continue
+        while datetime.now() < self._ends_at:
+            while not self._connect_to_camera():
+                print(self._rtsp)
+                print(f'Error on initial connection to camera! ({self._name})')
+                time.sleep(RECONNECT_DELAY_SECONDS)
 
-            date = self._get_nearest_range()
-            filename = f'{date.strftime(TIME_FORMAT)}.{VIDEO_EXTENSION}'
+            date_now = datetime.now()
+            filename = date_now.isoformat(timespec='seconds').replace(':', '_') + f'.{VIDEO_EXTENSION}'
 
-            self.writer = VideoWriterManager(
+            print(f'{self._path}/{filename}', self._camera_fps, self._camera_res)
+
+            self._writer = VideoWriterManager(
                 writer_path=f'{self._path}/{filename}',
                 fps=self._camera_fps,
                 resolution=self._camera_res,
             )
 
-            try:
-                print(date)
-                while self._record_cycle(date) != 0:
-                    handle_error(msg='Reconnecting...')
-            except Exception as e:
-                print(e)
-                handle_error(msg='Reconnecting to camera...')
-                self.writer.release()
-                continue
+            end_date = date_now + timedelta(minutes=DATA_RANGE_INTERVAL_IN_MINUTES)
+            while self._run_cycle(end_date) is None:
+                print(f'Error {self._name}')
+                self._db.change_record_status(self._db_key, 'error')
+                time.sleep(RECONNECT_DELAY_SECONDS)
 
+            self._writer.release()
             self._db.publish(PUBSUB_VIDEO_CHANNEL_NAME, f'{self._path}/{filename}')
-            break
 
-        self._db.change_record_status(self._db_key, 'completed')
+        self._db.complete_task(self._db_key)
         print('End')
 
         return 0

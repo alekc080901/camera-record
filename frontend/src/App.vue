@@ -6,7 +6,7 @@
 
 <script>
 import RecordType from './components/modals/RecordType.vue';
-import TaskTable from './components/TaskTable.vue';
+import TaskTable from './components/table/TaskTable.vue';
 import {
     GDialogRoot
 } from 'gitart-vue-dialog'

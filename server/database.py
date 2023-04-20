@@ -63,6 +63,10 @@ class RedisConnection:
     def task_is_running(self, key: str) -> bool:
         return self[f'tasks:{key}'] is not None
 
+    def complete_task(self, key: str):
+        self._r.delete(f'tasks:{key}')
+        self.change_record_status(key, 'completed')
+
     def reset_tasks(self):
         if keys := self._r.keys('tasks:*'):
             self._r.delete(*keys)

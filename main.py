@@ -10,7 +10,7 @@ def main():
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
 
     yandex_disk = DiskConnection(token=CLOUD_ACCESS_TOKEN)
-    # redis_db.reset_tasks()
+    redis_db.reset_tasks()
 
     recorder = RecordManager()
 

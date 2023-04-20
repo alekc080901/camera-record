@@ -10,20 +10,28 @@
             <div class="container mb-3">
                 <div class="form-group m-2">
                     <label for="record-name">Название записи</label>
-                    <input type="text" name="name" title="name" class="form-control" id="record-name" placeholder="Олег" required>
+                    <input type="text" name="name" title="name" class="form-control" id="record-name" placeholder="Олег" v-model="name" required>
                 </div>
+
                 <div class="form-group m-2">
                     <label for="record-rtsp">RTSP</label>
                     <input type="text" name="rtsp" title="rtsp" class="form-control" id="record-rtsp" placeholder="rtsp://" required>
                 </div>
+
                 <div class="form-group m-2">
                     <label for="record-rtsp">Директория</label>
-                    <input type="text" name="path" title="directory" class="form-control" id="record-path" placeholder="videos/Friday" required>
+                    <input type="text" name="path" title="directory" class="form-control" id="record-path" placeholder="videos/Friday" v-model="directory">
                 </div>
-                <div class="form-group m-2">
+
+                <div class="form-group m-2 mb-1">
                     <label for="record-fpm">Кадров в минуту</label>
-                    <input type="number" name="fpm" title="fpm" class="form-control" id="record-fpm" placeholder="1200" required>
+                    <input type="number" name="fpm" title="fpm" class="form-control" id="record-fpm" placeholder="1200" v-model="fpm" :disabled="audioChecked || nativeFpmChecked" required>
                 </div>
+                <div class="form-check m-2 mb-3">
+                    <label for="record-native-fpm">Использовать параметры камеры</label>
+                    <input type="checkbox" class="form-check-input" name="native-fpm" title="native-fpm" id="record-native-fpm" v-model="nativeFpmChecked">
+                </div>
+
                 <div class="form-group m-2 mb-3">
                     <label for="record-comment">Комментарий</label>
                     <textarea class="form-control" name="comment" title="comment" id="record-comment" rows="2" placeholder="Текст комментария"></textarea>
@@ -61,6 +69,11 @@
 
                     <input type="checkbox" class="btn-check" name="week-day" id="day-6" value="6" autocomplete="off">
                     <label class="btn btn-outline-primary" for="day-6">Воскресенье</label>
+                </div>
+
+                <div class="form-check m-2 mb-3">
+                    <label for="record-audio">Записывать аудиодорожку</label>
+                    <input type="checkbox" class="form-check-input" name="audio" title="audio" id="record-audio" v-model="audioChecked" >
                 </div>
 
                 <div class="row m-2">
@@ -102,8 +115,15 @@ export default {
             count: 0,
             timeComponents: [0],
 
+            name: localStorage.getItem('regularName'),
+            fpm: localStorage.getItem('regularFPM'),
+            directory: localStorage.getItem('regularDir'),
+
             formSendError: false,
             formSendErrorMessage: '',
+
+            audioChecked: false,
+            nativeFpmChecked: false,
         }
     },
     methods: {
@@ -148,10 +168,14 @@ export default {
                 fpm: form.fpm.value,
                 path: form.path.value,
                 intervals: this.getTime(form),
-                days_of_week: this.getWeekDays(form)
+                days_of_week: this.getWeekDays(form),
+                config: {
+                    audio: form.audio.checked
+                },
             }
 
-            console.log(jsonBody.intervals)
+            if (!form.fpm.disabled)
+                jsonBody.fpm = form.fpm.value
 
             await fetch('http://127.0.0.1:8000/regular', {
                     method: 'POST',
@@ -163,6 +187,11 @@ export default {
                 .then(async response => {
                     if (response.status >= 200 && response.status < 300) {
                         this.formSendError = false;
+
+                        localStorage.setItem('regularName', jsonBody.name);
+                        localStorage.setItem('regularFPM', jsonBody.fpm);
+                        localStorage.setItem('regularDir', jsonBody.path);
+
                         window.location.reload();
                         return response.json();
                     }

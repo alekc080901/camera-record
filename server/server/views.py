@@ -4,11 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import server.directory_methods as directory_methods
-import server.server.wait_functions as wait
 from server.const import DATE_FORMAT
 from server.server.schemas.record import VideoRecorderInput
 from server.server.schemas.record_regular import RegularVideoRecorderInput
-from server.video_recorder.record_process import VideoRecorder
 from server.database import RedisConnection
 from server.const import REDIS_SERVER, REDIS_PORT, REDIS_DB
 
@@ -40,25 +38,16 @@ async def start_record(video_params: VideoRecorderInput):
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
 
     # Записываю полученные значения из json в переменные
-    path, name, comment, rtsp_url, fpm, intervals = video_params.dict().values()
+    path, name, comment, rtsp_url, fpm, config, intervals = video_params.dict().values()
 
     # Создаю папку, в которую будут записываться видео с изображениями
-    name_of_dir = directory_methods.to_directory_friendly(name)
-    video_path = f'{path}/{name_of_dir}'
+    video_path = f'{path}/{name}' if path != '' else name
+    video_path = directory_methods.to_directory_friendly(video_path)
     directory_methods.mkdir(video_path)
 
     # Применяю функцию записи к каждому временному интервалу
     for i, interval in enumerate(intervals):
         task_db_key = f'videos:{name}:{i}'
-        rec = VideoRecorder(
-            db_key=task_db_key,
-            rtsp_string=rtsp_url,
-            name=name_of_dir,
-            path=video_path,
-            fpm=fpm,
-            start_date=interval['date_from'],
-            end_date=interval['date_to'],
-        )
 
         # TODO: Добавить нормальную аннотацию типов через методы класса
         # Запись в БД
@@ -71,6 +60,7 @@ async def start_record(video_params: VideoRecorderInput):
             "date_to": interval['date_to'].strftime(DATE_FORMAT),
             "fpm": fpm,
             "status": "queued",
+            "with_audio": config['audio'],
         }
 
         # Запуск процесса записи
@@ -78,7 +68,7 @@ async def start_record(video_params: VideoRecorderInput):
 
 
 @app.post('/regular')
-async def start_record(video_params: RegularVideoRecorderInput):
+async def start_regular_record(video_params: RegularVideoRecorderInput):
     """
     Post-запрос для записи видео. См. VideoRecorderInput для списка параметров.
     :param video_params: Входные данные для записи, извлекаемые из json-объекта тела запроса
@@ -87,10 +77,10 @@ async def start_record(video_params: RegularVideoRecorderInput):
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
 
     # Записываю полученные значения из json в переменные
-    path, name, comment, rtsp_url, fpm, intervals, days = video_params.dict().values()
+    path, name, comment, rtsp_url, fpm, config, intervals, days = video_params.dict().values()
 
-    name_of_dir = directory_methods.to_directory_friendly(name)
-    video_path = f'{path}/{name_of_dir}'
+    video_path = f'{path}/{name}' if path != '' else name
+    video_path = directory_methods.to_directory_friendly(video_path)
 
     for i, interval in enumerate(intervals):
         task_id = f'regular:{name}:{i}'
@@ -106,6 +96,7 @@ async def start_record(video_params: RegularVideoRecorderInput):
             "fpm": fpm,
             "status": "queued",
             "days_of_week": days,
+            "with_audio": config['audio'],
         }
 
 

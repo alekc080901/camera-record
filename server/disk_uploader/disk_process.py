@@ -24,16 +24,16 @@ class DiskConnection(multiprocessing.Process):
 
     def upload(self, src_path: str, dest_path: str):
         if not directory_methods.exists(src_path):
-            print('No video file found; cancel upload to cloud!')
+            print('No file found; cancel upload to cloud!')
             return
 
-        self._mkdir_recursively(dest_path)
-
         try:
+            self._mkdir_recursively(dest_path)
+
             src_path = directory_methods.change_extension(src_path, 'tmp', rename_file=True)
             dest_path = directory_methods.change_extension(dest_path, 'tmp')
 
-            with contextlib.suppress(yadisk.exceptions.PathExistsError):
+            if not self._conn.exists(dest_path):
                 self._conn.upload(
                     src_path,
                     dest_path,
@@ -44,8 +44,11 @@ class DiskConnection(multiprocessing.Process):
                 filename = directory_methods.change_extension(filename, VIDEO_EXTENSION)
                 self._conn.rename(dest_path, filename)
 
-        except (yadisk.exceptions.ConflictError, yadisk.exceptions.LockedError) as e:
-            print('Error while sending video to disk!')
+        except (yadisk.exceptions.ConflictError, yadisk.exceptions.LockedError, PermissionError) as e:
+            print('Error while sending to disk!')
+            print(e)
+        except (Exception) as e:
+            print(f'Unknown exception! {dest_path}')
             print(e)
 
     def _mkdir_recursively(self, path: str):
@@ -72,3 +75,8 @@ class DiskConnection(multiprocessing.Process):
 
     def start(self) -> None:
         super().start()
+
+
+if __name__ == '__main__':
+    yandex_disk = DiskConnection(token='y0_AgAAAAALeWngAAk_4QAAAADhNY13bDy5DG7RRCeiby8aDYpzelmB_wY')
+    yandex_disk.upload('../tmp.tmp', 'tmp.tmp')
