@@ -1,5 +1,5 @@
 <template>
-<DateFilter :data="allTasks" v-model="selectedDateStr"/>
+<DateFilter :data="allTasks" v-model="selectedDateStr" />
 
 <table class="table">
     <thead>
@@ -13,7 +13,7 @@
         </tr>
     </thead>
 
-    <TableRow v-for="(task, index) in selectedTasks" :key="index" :id="index" :data="task"/>
+    <TableRow :class="{'table-row-delayed': task.type === 'delayed', 'table-row-error': task.status === 'error', 'table-row-regular': task.type === 'regular'}" v-for="(task, index) in selectedTasks" :key="index" :id="index" :data="task" @delete="deleteRecord(task.name)" />
 </table>
 <div v-if="loadError" style="white-space: pre-line" class="alert alert-danger" role="alert">
     {{ loadErrorMessage }}
@@ -35,6 +35,7 @@ export default {
         return {
             regularTasks: [],
             delayedTasks: [],
+            allTasks: [],
 
             loadError: false,
             loadErrorMessage: '',
@@ -44,9 +45,6 @@ export default {
     },
 
     computed: {
-        allTasks() {
-            return [...this.delayedTasks, ...this.regularTasks];
-        },
         selectedTasks() {
             return this.allTasks.filter(this.isRowDateSelected);
         },
@@ -88,10 +86,20 @@ export default {
             }
 
             const isTheDay = (day) => (day.getDate() == this.selectedDate.day) && (day.getMonth() == this.selectedDate.month)
-            
+
             const startsAt = new Date(dataRow.startsAt);
             const endsAt = new Date(dataRow.endsAt);
-            return isTheDay(startsAt) || isTheDay(endsAt);
+            return dataRow.type === 'regular' || isTheDay(startsAt) || isTheDay(endsAt);
+        },
+        deleteRecord(name) {
+            fetch(`http://127.0.0.1:8000/${name}`, {
+                    method: 'DELETE',
+                })
+                .then(response => {
+                    if (response.status >= 200 && response.status < 300) {
+                        window.location.reload();
+                    }
+                });
         }
     },
 
@@ -118,6 +126,8 @@ export default {
             }) => {
                 this.delayedTasks = Object.values(records).map(rec => this.parseDelayedRecord(rec));
                 this.regularTasks = Object.values(regularRecords).map(rec => this.parseRegularRecord(rec));
+
+                this.allTasks = [...this.delayedTasks, ...this.regularTasks];
             })
             .catch(e => {
                 this.loadError = true;
@@ -127,3 +137,22 @@ export default {
     }
 }
 </script>
+
+<style scoped>
+table {
+    margin-left: 3%;
+    max-width: 97%;
+}
+
+.table-row-delayed {
+    background-color: rgb(252, 246, 168);
+}
+
+.table-row-regular {
+    background-color: rgb(141, 211, 235);
+}
+
+.table-row-error {
+    background-color: rgb(253, 121, 126);
+}
+</style>

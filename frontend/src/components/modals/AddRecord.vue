@@ -53,6 +53,11 @@
                     <input type="checkbox" class="form-check-input" name="audio" title="audio" id="record-audio" v-model="audioChecked" >
                 </div>
 
+                <div class="form-group m-2 mb-1">
+                    <label for="record-segment">Продолжительность сегмента (в минутах)</label>
+                    <input type="number" name="segment" title="segment" class="form-control" id="record-segment" placeholder="30" value="30" required>
+                </div>
+
                 <div class="row m-2">
                     <button class="col btn btn-primary m-2" type="submit">Начать запись</button>
                     <button class="col btn btn-secondary m-2" type="button" @click="onClose">Отмена</button>
@@ -153,7 +158,8 @@ export default {
                 path: form.path.value,
                 intervals: this.getDates(form),
                 config: {
-                    audio: form.audio.checked
+                    audio: form.audio.checked,
+                    segment_time: form.segment.value,
                 },
             }
 

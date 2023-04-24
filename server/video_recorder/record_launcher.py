@@ -17,15 +17,34 @@ def str_to_datetime(datetime_str: str) -> datetime:
     return datetime.strptime(datetime_str, DATE_FORMAT)
 
 
+def generate_day_label(day: datetime):
+    idx_to_month = {
+        1: 'January',
+        2: 'February',
+        3: 'March',
+        4: 'April',
+        5: 'May',
+        6: 'June',
+        7: 'July',
+        8: 'August',
+        9: 'September',
+        10: 'October',
+        11: 'November',
+        12: 'December',
+    }
+
+    return f'{day.day} {idx_to_month[day.month]} {day.year}'
+
+
 class RecordLauncher:
     @staticmethod
     def seek_for_record(db: RedisConnection, today: datetime):
         def date_in_interval(start: datetime, end: datetime):
             return start < today < end
 
-        tasks = db.get_keys('videos:*')
+        recs = db.get_keys('videos:*')
 
-        for task in tasks:
+        for task in recs:
             info = db[task]
 
             # Запускать процесс, если:
@@ -36,22 +55,10 @@ class RecordLauncher:
                 return task, info
 
     @staticmethod
-    def start_record_process(key: str, name: str, rtsp: str, path: str, fpm: int, today: datetime, end_date: datetime,
-                             with_audio=False):
-        start_date = today
+    def start_record_process(with_audio=False, **kwargs):
+        process = create_recorder(audio=with_audio, start_date=datetime.now(), **kwargs)
 
-        process = create_recorder(
-            audio=with_audio,
-            rtsp_string=rtsp,
-            name=name,
-            path=path,
-            fpm=fpm,
-            start_date=start_date,
-            end_date=end_date,
-            db_key=key,
-        )
-
-        directory_methods.mkdir(path)
+        directory_methods.mkdir(kwargs['path'])
         process.start()
 
 
@@ -67,40 +74,33 @@ class RegularRecordLauncher:
 
             return now >= start and now >= end or now <= start and now <= end
 
-        tasks = db.get_keys('regular:*')
+        recs = db.get_keys('regular:*')
 
-        for task in tasks:
+        for task in recs:
             info = db[task]
 
             # Запускать процесс, если:
             # 1) совпадает день недели;
             # 2) процесс еще не запущен;
             # 3) процесс находится во временном промежутке запуска.
+
             if today_is_day_of_week(info['days_of_week']) and \
                     not db.task_is_running(task) and \
                     time_in_interval(today.time(), str_to_time(info['time_from']), str_to_time(info['time_to'])):
                 return task, info
 
     @staticmethod
-    def start_record_process(key: str, name: str, rtsp: str, path: str, fpm: int, today: datetime, end_time: time,
-                             with_audio=False):
+    def start_record_process(end_time, with_audio=False, **kwargs):
+        today = datetime.now()
+
         start = datetime(today.year, today.month, today.day, today.hour, today.minute, today.second)
 
         tmp = start + timedelta(days=1) if end_time < start.time() else start
         end = datetime(tmp.year, tmp.month, tmp.day, end_time.hour, end_time.minute, end_time.second)
 
-        process = create_recorder(
-            audio=with_audio,
-            rtsp_string=rtsp,
-            name=name,
-            path=path,
-            fpm=fpm,
-            start_date=start,
-            end_date=end,
-            db_key=key,
-        )
+        process = create_recorder(audio=with_audio, start_date=datetime.now(), end_date=end, **kwargs)
 
-        directory_methods.mkdir(path)
+        directory_methods.mkdir(kwargs['path'])
 
         process.start()
 
@@ -119,16 +119,18 @@ class RecordManager(multiprocessing.Process):
             if ret := RegularRecordLauncher.seek_for_regular_record(db, now):
                 key, info = ret
 
+                subdirectory = generate_day_label(datetime.now())
+
                 print(f'Start {info["name"]}')
                 RegularRecordLauncher.start_record_process(
-                    key=key,
+                    db_key=key,
                     name=info['name'],
-                    path=info['path'],
+                    path=f'{info["path"]}/{subdirectory}',
                     fpm=info['fpm'],
                     rtsp=info['rtsp_url'],
-                    today=now,
                     end_time=str_to_time(info['time_to']),
                     with_audio=info['with_audio'],
+                    segment_time=info['segment_time'],
                 )
                 db.init_task(key)
                 continue
@@ -138,14 +140,14 @@ class RecordManager(multiprocessing.Process):
 
                 print(f'Start {info["name"]}')
                 RecordLauncher.start_record_process(
-                    key=key,
+                    db_key=key,
                     name=info['name'],
                     path=info['path'],
                     fpm=info['fpm'],
                     rtsp=info['rtsp_url'],
-                    today=now,
                     end_date=str_to_datetime(info['date_to']),
                     with_audio=info['with_audio'],
+                    segment_time=info['segment_time'],
                 )
                 db.init_task(key)
                 continue

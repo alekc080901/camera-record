@@ -1,6 +1,9 @@
 <template>
 <tr>
-    <td>{{ id + 1 }}</td>
+    <td class="record-id">
+        <img class="trash-icon" :src="require('@/assets/trash.svg')" @click="$emit('delete')">
+        <span>{{ id + 1 }}</span>
+    </td>
     <td>{{ data.name }}</td>
     <td>{{ type}}</td>
     <td>{{ progress }}%</td>
@@ -16,11 +19,12 @@ export default {
         id: Number,
         data: Object,
     },
+    emits: ['delete'],
     computed: {
         status() {
             const statuses = {
                 'queued': 'Ожидание...',
-                'in_progress': 'Обработка...',
+                'in_progress': 'Идет запись...',
                 'completed': 'Готово!',
                 'error': 'Переподключение...',
             }
@@ -49,3 +53,21 @@ export default {
     }
 }
 </script>
+
+<style>
+.record-id {
+    position: relative;
+}
+
+.trash-icon {
+    height: 38px;
+    position: absolute;
+    margin-top: auto;
+    margin-bottom: auto;
+    top: 0;
+    bottom: 10%;
+    right: 60%;
+    text-align: center;
+    cursor: pointer;
+}
+</style>

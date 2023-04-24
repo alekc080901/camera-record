@@ -3,6 +3,7 @@ import json
 import redis
 
 from typing import Literal
+from itertools import chain
 
 
 class RedisConnection:
@@ -31,11 +32,19 @@ class RedisConnection:
         results = self._r.keys(pattern)
         return [r.decode('utf-8') for r in results]
 
-    def load_records_dict(self):
+    def get_all_records(self):
         return {
             'records': {rec: self[rec] for rec in self.get_keys('videos:*')},
             'regularRecords': {rec: self[rec] for rec in self.get_keys('regular:*')}
         }
+
+    def delete_record(self, name):
+        keys = chain(self._r.keys('videos:*'), self._r.keys('regular:*'))
+        for key in keys:
+            if self[key]['name'] == name:
+                self._r.delete(key)
+                self._r.delete(f'tasks:{key}')
+                break
 
     def has(self, pattern: str) -> bool:
         return any(True for _ in self._r.scan_iter(pattern))
@@ -58,7 +67,7 @@ class RedisConnection:
     def init_task(self, key: str):
         self.change_record_status(key, 'in_progress')
 
-        self._r[f'tasks:{key}'] = 0
+        self[f'tasks:{key}'] = {}
 
     def task_is_running(self, key: str) -> bool:
         return self[f'tasks:{key}'] is not None
@@ -66,6 +75,17 @@ class RedisConnection:
     def complete_task(self, key: str):
         self._r.delete(f'tasks:{key}')
         self.change_record_status(key, 'completed')
+
+    def add_running_process(self, key: str, pid: int, path: str):
+        task_info = self[f'tasks:{key}']
+        task_info[pid] = path
+        self[f'tasks:{key}'] = task_info
+
+    def complete_process(self, key: str, pid: int):
+        task_info = self[f'tasks:{key}']
+        del task_info[str(pid)]
+        self[f'tasks:{key}'] = task_info
+
 
     def reset_tasks(self):
         if keys := self._r.keys('tasks:*'):

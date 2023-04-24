@@ -42,14 +42,16 @@ export default {
 
     computed: {
         dateIntervals() {
+
             return this.data
+                .filter(record => record.type !== 'regular')
                 .map(record => {
-                    return this.dayMonthNum(record.startsAt), this.dayMonthNum(record.endsAt);
+                    return [this.dayMonthNum(record.startsAt), this.dayMonthNum(record.endsAt)];
                 })
                 .flat()
-                .filter((value, index, array) => array.indexOf(value) === index) // Оставляем уникальные
+                .filter(this.uniqueFilter) 
                 .sort((a, b) => {
-                    return b.replace(' ', '') - a.replace(' ', '')
+                    return b.replace(' ', '') - a.replace(' ', '');
                 })
                 .map(value => {
                     return {
@@ -61,6 +63,9 @@ export default {
     },
 
     methods: {
+        uniqueFilter(value, index, self) {
+            return self.indexOf(value) === index;
+        },
         dayMonthNum(dateString) {
             const date = new Date(dateString);
             return `${date.getMonth()} ${date.getDate()}`

@@ -22,7 +22,13 @@ class DiskConnection(multiprocessing.Process):
         self._conn: yadisk.YaDisk | None = None
         self._token = token
 
-    def upload(self, src_path: str, dest_path: str):
+    def upload_video(self, src_path: str, dest_path: str):
+        """
+        Отправляет видео на Яндекс диск
+        :param src_path: Путь до видео
+        :param dest_path: Конечный путь видео на диске
+        :return:
+        """
         if not directory_methods.exists(src_path):
             print('No file found; cancel upload to cloud!')
             return
@@ -52,6 +58,11 @@ class DiskConnection(multiprocessing.Process):
             print(e)
 
     def _mkdir_recursively(self, path: str):
+        """
+        Создает вложенные директории на Яндекс диске
+        :param path: Путь до файла/папки, из которого извлекаются необходимые для создания директории
+        :return:
+        """
         dirs = directory_methods.extract_directories(path)
 
         for d in dirs:
@@ -59,12 +70,16 @@ class DiskConnection(multiprocessing.Process):
                 self._conn.mkdir(d)
 
     def _seek(self):
+        """
+        Поиск готовых для отправки видео через систему publisher-subscriber Redis
+        :return:
+        """
         subscription = RedisConnection().subscribe(PUBSUB_VIDEO_CHANNEL_NAME)
         while True:
             if message := subscription.get_message(ignore_subscribe_messages=True):
                 video_path = message['data'].decode('utf-8')
                 print('Sending video...')
-                self.upload(video_path, video_path)
+                self.upload_video(video_path, video_path)
                 print('Completed')
             time.sleep(1)
 
@@ -73,10 +88,13 @@ class DiskConnection(multiprocessing.Process):
         self._conn = yadisk.YaDisk(token=self._token)
         self._seek()
 
-    def start(self) -> None:
-        super().start()
-
 
 if __name__ == '__main__':
     yandex_disk = DiskConnection(token='y0_AgAAAAALeWngAAk_4QAAAADhNY13bDy5DG7RRCeiby8aDYpzelmB_wY')
-    yandex_disk.upload('../tmp.tmp', 'tmp.tmp')
+    yandex_disk._conn = yadisk.YaDisk(token='y0_AgAAAAALeWngAAk_4QAAAADhNY13bDy5DG7RRCeiby8aDYpzelmB_wY')
+
+    import glob
+
+    for file in glob.glob('../../Exchange/Planeta/20 April 2023/*.mkv') + glob.glob('../../Exchange/Planeta/20 April 2023/*.tmp'):
+        print(file, file[6:])
+        yandex_disk.upload_video(file, file[6:])

@@ -5,8 +5,7 @@ from datetime import datetime
 
 async def until_async(date: datetime):
     """
-    Pause your program until a specific end time.
-    'time' is either a valid datetime object or unix timestamp in seconds (i.e. seconds since Unix epoch)
+    Алгоритм асинхронного ожидания до указанной даты
     """
 
     while datetime:
