@@ -30,9 +30,8 @@ app.add_middleware(
 @app.post('/')
 async def start_record(rec: VideoRecorderInput):
     """
-    Post-запрос для записи видео. См. VideoRecorderInput для списка параметров.
+    Post-запрос для записи отложенных видео. См. VideoRecorderInput для списка параметров.
     :param rec: Входные данные для записи, извлекаемые из json-объекта тела запроса
-    :return:
     """
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
 
@@ -67,9 +66,8 @@ async def start_record(rec: VideoRecorderInput):
 @app.post('/regular')
 async def start_regular_record(rec: RegularVideoRecorderInput):
     """
-    Post-запрос для записи видео. См. VideoRecorderInput для списка параметров.
+    Post-запрос для записи регулярных видео. См. RegularVideoRecorderInput для списка параметров.
     :param rec: Входные данные для записи, извлекаемые из json-объекта тела запроса
-    :return:
     """
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
 
@@ -98,7 +96,7 @@ async def start_regular_record(rec: RegularVideoRecorderInput):
 @app.get('/')
 async def get_records():
     """
-    Получение списка записей из БД
+    Получение списка записей из БД.
     :return:
     """
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
@@ -108,9 +106,8 @@ async def get_records():
 @app.delete('/{name}')
 async def delete_record(name: str):
     """
-    Удаление записи с указанным в параметрах запроса именем
-    :param name:
-    :return:
+    Удаление записи с указанным в параметрах запроса именем.
+    :param name: Имя записи
     """
     redis_db = RedisConnection(REDIS_SERVER, REDIS_PORT, REDIS_DB)
     redis_db.delete_record(name)

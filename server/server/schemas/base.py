@@ -28,15 +28,3 @@ class BaseRecord(ABC, BaseModel):
     @validator("path")
     def correct_path(cls, path):
         return path.strip('/\\')
-
-    # @validator("config")
-    # def config_values(cls, config):
-    #     options = {'audio'}
-    #
-    #     if any(key not in options for key in config.keys()):
-    #         raise ValueError('Wrong configuration options!')
-    #
-    #     for unmatched_option in options - set(config.keys()):
-    #         config[unmatched_option] = False
-    #
-    #     return config

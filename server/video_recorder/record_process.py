@@ -17,12 +17,21 @@ from server.video_recorder.video_writer_manager import VideoWriterManager
 class VideoRecorder(multiprocessing.Process):
     """
     Процесс для записи видео камерой.
+    Является процессом из библиотеки multiprocessing. Для записи используется библиотека OpenCV.
     :param rtsp: URL для подключения к камере
     :param name: Идентификатор записи
     :param start_date: Дата и время начала записи
     :param end_date: Дата и время конца записи
     :param fpm: Количество кадров в минуту, записываемых камерой
     :param db_key: Идентификатор записи в базе данных
+    :param segment_time: Время одной записи (по умолчанию DEFAULT_SEGMENT_TIME из const.py), по истечении которого
+    происходит разбиение
+
+    :param self._cap: Объект подключения к камере VideoCapture из OpenCV
+    :param self._fps: Количество кадров в секунду, записываемых камерой
+    :param self._camera_fps: FPS камеры, получаемый при подключении к камере
+    :param self._db: Указатель на базу данных Redis
+    :param self._writer: Объект класса VideoWriterManager
     """
 
     def __init__(self, rtsp: str, name: str, path: str, start_date: datetime, end_date: datetime,
@@ -50,6 +59,11 @@ class VideoRecorder(multiprocessing.Process):
         self._writer = None
 
     def _connect_to_camera(self):
+        """
+        Попытка подключение к камере по rtsp.
+        Обновляет параметры класса self._cap, self._camera_fps, self._camera_res.
+        :return: True при успешном подключении; иначе False
+        """
         try:
             self._cap = cv2.VideoCapture(self.rtsp)
 

@@ -9,6 +9,11 @@ from server.const import IMAGE_EXTENSIONS
 
     
 def exists(path: str) -> bool:
+    """
+    Есть ли файл/папка по пути
+    :param path: Путь
+    :return: True or False
+    """
     return os.path.exists(path)
 
 
@@ -32,6 +37,12 @@ def get_extension(filename: str) -> str:
 
 
 def extract_filename(path: str):
+    """
+    Извлекает полное имя файла из пути.
+    Пример: 'hello/world.txt' -> 'world.txt'.
+    :param path: Путь к файлу (необязательно должен существовать)
+    :return: Полное имя файла
+    """
     return os.path.basename(path)
 
 
@@ -84,6 +95,13 @@ def delete_images(path: str):
 
 
 def extract_directories(path: str):
+    """
+    Извлекает из пути все папки и подпапки в порядке от родителя к ребенку.
+    Путь должен существовать.
+    Пример: 'server/disk_uploader/disk_process.py' -> ['server', 'server/disk_uploader'].
+    :param path: Путь до папки/файла
+    :return: Список директорий
+    """
     dirs = re.split(r'/|\\', path)
     dirs = dirs if Path(path).is_dir() else dirs[:-1]
 
@@ -96,6 +114,14 @@ def extract_directories(path: str):
 
 
 def change_extension(path: str, extension: str, rename_file=False):
+    """
+    Меняет расширение файла, не трогая его имя.
+    Пример: ('server/file.txt', 'mkv') -> 'server/file.mkv'.
+    :param path: Путь до файла
+    :param extension: Новое расширение
+    :param rename_file: Нужно ли менять расширение у файла в ОС
+    :return: Путь к файлу с новым расширением
+    """
     if os.path.isdir(path):
         return
 
@@ -107,10 +133,21 @@ def change_extension(path: str, extension: str, rename_file=False):
 
 
 def rename(old_path: str, new_path: str):
+    """
+    Переименовывание файла.
+    :param old_path: Путь до файла
+    :param new_path: Путь до файла с новым именем
+    """
     os.replace(old_path, new_path)
 
 
 def create_copy_of_filename(path: str) -> str:
+    """
+    Создает дубликат имени файла.
+    Пример: 'hello/world.txt' ->  'hello/world_.txt'
+    :param path: Путь к файлу (необязательно должен существовать)
+    :return: Дубликат имени файла
+    """
     filename = f'{get_filename(extract_filename(path))}_'
     extension = get_extension(path)
     directory = os.path.dirname(path)
@@ -128,4 +165,8 @@ def to_directory_friendly(string: str) -> str:
 
 
 def mkdir(path: str):
+    """
+    Создает директории и поддиректории соответственно
+    :param path: Путь с директориями
+    """
     Path(path).mkdir(parents=True, exist_ok=True)

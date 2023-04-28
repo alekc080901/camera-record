@@ -16,5 +16,5 @@ REDIS_PORT = 6379
 REDIS_DB = 0
 
 # Портится через год
-CLOUD_ACCESS_TOKEN = 'y0_AgAAAAA83hh6AAk_4QAAAADfgmJZgRgekPOASoSfsXFl8a3coiyew-U'  # Roby.market
-# CLOUD_ACCESS_TOKEN = 'y0_AgAAAAALeWngAAk_4QAAAADhNY13bDy5DG7RRCeiby8aDYpzelmB_wY'  # Planeta
+# CLOUD_ACCESS_TOKEN = 'y0_AgAAAAA83hh6AAk_4QAAAADfgmJZgRgekPOASoSfsXFl8a3coiyew-U'  # Roby.market
+CLOUD_ACCESS_TOKEN = 'y0_AgAAAAALeWngAAk_4QAAAADhNY13bDy5DG7RRCeiby8aDYpzelmB_wY'  # Planeta

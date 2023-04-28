@@ -1,3 +1,4 @@
+import contextlib
 import os
 import subprocess
 import threading
@@ -13,13 +14,17 @@ from server.database import RedisConnection
 
 class VideoAudioRecorder(threading.Thread):
     """
-    Процесс для записи видео камерой.
+    Процесс для записи видео камерой со звуком.
+    Является потоком из библиотеки threading. Для записи используется библиотека subprocess и утилита ffmpeg.
     :param rtsp: URL для подключения к камере
     :param name: Идентификатор записи
     :param start_date: Дата и время начала записи
     :param end_date: Дата и время конца записи
-    :param fpm: Количество кадров в минуту, записываемых камерой
     :param db_key: Идентификатор записи в базе данных
+    :param segment_time: Время одной записи (по умолчанию DEFAULT_SEGMENT_TIME из const.py), по истечении которого
+    происходит разбиение
+
+    :param self._db: Указатель на базу данных Redis
     """
 
     def __init__(self, rtsp: str, name: str, path: str, start_date: datetime, segment_time: int,
@@ -36,18 +41,7 @@ class VideoAudioRecorder(threading.Thread):
         self._db = None
         self.db_key = db_key
 
-        self.segment_time = 62
-
-    @staticmethod
-    def _wait(process, secs, process_check_interval=5):
-        stop_point = datetime.now() + timedelta(seconds=secs)
-        while datetime.now() < stop_point:
-            print(process.returncode)
-            time.sleep(process_check_interval)
-
-            poll = process.poll()
-            if poll is not None:
-                return
+        self.segment_time = segment_time
 
     def record(self):
         """
@@ -67,28 +61,25 @@ class VideoAudioRecorder(threading.Thread):
             path = f'{self.path}/{filename}'
 
             remain_seconds = (self.ends_at - datetime.now()).seconds
-            one_segment_time = min(self.segment_time, remain_seconds)
+            one_segment_time = min(self.segment_time * 60, remain_seconds)
             print(remain_seconds, one_segment_time)
-            ffmpeg_record_string = f'ffmpeg ' \
+            ffmpeg_record_string = f'ffmpeg -t {one_segment_time} ' \
                                    f'-rtsp_transport tcp -use_wallclock_as_timestamps 1 ' \
                                    f'-i {self.rtsp} -reset_timestamps 1 ' \
                                    f'-vcodec copy -pix_fmt yuv420p -threads 0 -crf 0 -preset ultrafast ' \
                                    f'-tune zerolatency -acodec pcm_s16le' \
                                    f' -strftime 1 "{path}" -y'
-
-            print(ffmpeg_record_string)
             print(path)
             p = subprocess.Popen(
                 ffmpeg_record_string,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                stdout=subprocess.DEVNULL
             )
-            self._db.add_running_process(self.db_key, p.pid, self.path)
 
-            self._wait(p, one_segment_time)
-
-            self._db.complete_process(self.db_key, p.pid)
-            p.terminate()
+            # Добавление работающих процессов в теории должно было стать частью фичи по их удалению
+            # self._db.add_running_process(self.db_key, p.pid, self.path)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                p.wait(timeout=one_segment_time + 10)  # Ждем на 10 секунд дольше
+            # self._db.complete_process(self.db_key, p.pid)
 
             if p.returncode is not None and p.returncode != 0:
                 print(f'Error while recording video with audio! {self.name}')

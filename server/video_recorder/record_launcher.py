@@ -10,14 +10,29 @@ from server.video_recorder.record_factory import create_recorder
 
 
 def str_to_time(time_str: str) -> time:
+    """
+    Перевод строки в datetime.time
+    :param time_str: Строка со временем в формате DATE_FORMAT
+    :return: Время datetime.time
+    """
     return datetime.strptime(time_str, DATE_FORMAT).time()
 
 
 def str_to_datetime(datetime_str: str) -> datetime:
+    """
+    Перевод строки в datetime.datetime
+    :param datetime_str: Строка с датой в формате DATE_FORMAT
+    :return: Дата datetime.time
+    """
     return datetime.strptime(datetime_str, DATE_FORMAT)
 
 
 def generate_day_label(day: datetime):
+    """
+    Переводит дату формата datetime.datetime в надпись формата "1 Января"
+    :param day: Дата
+    :return: Отформатированная строка
+    """
     idx_to_month = {
         1: 'January',
         2: 'February',
@@ -37,8 +52,18 @@ def generate_day_label(day: datetime):
 
 
 class RecordLauncher:
+    """
+    Статический класс-менеджер, ответственный за запуск процессов отложенной записи.
+    """
     @staticmethod
     def seek_for_record(db: RedisConnection, today: datetime):
+        """
+        Осуществляет поиск незапущенных процессов отложенной записи.
+        :param db: Указатель на базу данных
+        :param today: Сегодняшний день. Понятия не имею, почему я принимаю его как параметром, а не вычисляю in-place
+        :return task: Ключ записи БД
+        :return info: Информация в виде словаря по ключу записи БД
+        """
         def date_in_interval(start: datetime, end: datetime):
             return start < today < end
 
@@ -56,6 +81,11 @@ class RecordLauncher:
 
     @staticmethod
     def start_record_process(with_audio=False, **kwargs):
+        """
+        Запускает процесс отложенной записи
+        :param with_audio: Нужно ли записывать звук
+        :param kwargs: Аргументы объекта записи
+        """
         process = create_recorder(audio=with_audio, start_date=datetime.now(), **kwargs)
 
         directory_methods.mkdir(kwargs['path'])
@@ -63,8 +93,18 @@ class RecordLauncher:
 
 
 class RegularRecordLauncher:
+    """
+    Статический класс-менеджер, ответственный за запуск потоков регулярной записи.
+    """
     @staticmethod
     def seek_for_regular_record(db: RedisConnection, today: datetime):
+        """
+        Осуществляет поиск незапущенных процессов отложенной записи.
+        :param db: Указатель на базу данных
+        :param today: Сегодняшний день
+        :return task: Ключ записи БД
+        :return info: Информация в виде словаря по ключу записи БД
+        """
         def today_is_day_of_week(permitted_days: list[int]) -> bool:
             return today.weekday() in permitted_days
 
@@ -91,6 +131,12 @@ class RegularRecordLauncher:
 
     @staticmethod
     def start_record_process(end_time, with_audio=False, **kwargs):
+        """
+        Запускает поток регулярной записи
+        :param with_audio: Нужно ли записывать звук
+        :param end_time: Время конца записи
+        :param kwargs: Аргументы объекта записи
+        """
         today = datetime.now()
 
         start = datetime(today.year, today.month, today.day, today.hour, today.minute, today.second)
@@ -106,6 +152,9 @@ class RegularRecordLauncher:
 
 
 class RecordManager(multiprocessing.Process):
+    """
+    Непосредственно класс, сканирующий каждые n секунд наличие новых записей в БД, необходимых к запуску
+    """
     SCAN_INTERVAL_SECONDS = 10
     TIME_FORMAT = '%H:%M:%S'
 

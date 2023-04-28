@@ -17,7 +17,7 @@ def main():
     recorder.start()
     yandex_disk.start()
 
-    uvicorn.run('server.server.views:app', host="127.0.0.1", reload=False, port=8001)
+    uvicorn.run('server.server.views:app', host="127.0.0.1", reload=False, port=8000)
 
 
 if __name__ == "__main__":

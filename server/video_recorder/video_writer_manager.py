@@ -4,7 +4,13 @@ import server.directory_methods as directory_methods
 from server.const import VIDEO_CODEC
 
 
-def extract_images_from_video(video_path: str):
+def extract_frames_from_video(video_path: str):
+    """
+    Считывает все кадры из видео.
+    :param video_path: Путь до видео
+    :return video_info: Информация о разрешении и fps камеры
+    :return images: Список кадров из видео
+    """
     vid = cv2.VideoCapture(video_path)
     images = []
 
@@ -25,10 +31,23 @@ def extract_images_from_video(video_path: str):
 
 
 class VideoWriterManager:
+    """
+    Осуществляет запись кадров в файл (в данном случае из трансляции с камеры)
+    :param writer_path: Путь до видео
+    :param fps: FPS видеофайла
+    :param resolution: Разрешение видеофайла
+
+    :param self._copy: Находится ли по указанному пути видеофайл
+    """
 
     @staticmethod
     def _get_video_writer_from_existing_video(video_path):
-        info, images = extract_images_from_video(video_path)
+        """
+        Возвращает объект VideoWriter из OpenCV, считывая изображения из видео
+        :param video_path: Путь до существующего видео
+        :return: Объект VideoWriter
+        """
+        info, images = extract_frames_from_video(video_path)
 
         new_path = directory_methods.create_copy_of_filename(video_path)
         resolution, fps = info
@@ -45,7 +64,7 @@ class VideoWriterManager:
 
         return writer
 
-    def __init__(self, *, writer_path, fps, resolution):
+    def __init__(self, *, writer_path: str, fps: int | float, resolution: tuple[int, int]):
         self._path = writer_path
 
         if directory_methods.exists(writer_path):
@@ -61,9 +80,16 @@ class VideoWriterManager:
             )
 
     def write(self, image):
+        """
+        Запись изображения в видео.
+        :param image: Изображение
+        """
         self._writer.write(image)
 
     def release(self):
+        """
+        Прекращение процесса записи в файл.
+        """
         self._writer.release()
 
         if self._copy:

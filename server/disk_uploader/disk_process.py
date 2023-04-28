@@ -10,6 +10,10 @@ from server.database import RedisConnection
 
 
 class DiskConnection(multiprocessing.Process):
+    """
+    Класс осуществляет запись на Яндекс Диск (в данном случае запись видео).
+    Singleton.
+    """
     connection = None
 
     def __new__(cls, *args, **kwargs):
